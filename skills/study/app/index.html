@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude Study Tool</title>
 <meta name="theme-color" content="#2E6F87">
+<!--STUDY_PREFS-->
 <script>
 /* Theme before first paint: no flash. Tide needs no web fonts; the others load theirs here. */
 (function () {
@@ -20,10 +21,19 @@
       l.href = "https://fonts.googleapis.com/css2?" + FONTS[t] + "&display=swap";
       document.head.appendChild(l);
     }
-    if (persist) try { localStorage.setItem("study-theme", t); } catch (e) {}
+    if (persist) {
+      try { localStorage.setItem("study-theme", t); } catch (e) {}
+      window.savePref({ theme: t });
+    }
     return t;
   };
-  var saved = null; try { saved = localStorage.getItem("study-theme"); } catch (e) {}
+  // Saved on the server as well: localStorage belongs to one address (127.0.0.1 vs localhost, one port).
+  window.savePref = function (d) {
+    window.STUDY_PREFS = Object.assign(window.STUDY_PREFS || {}, d);
+    try { fetch("/api/prefs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) }); } catch (e) {}
+  };
+  var saved = (window.STUDY_PREFS || {}).theme || null;
+  if (!saved) try { saved = localStorage.getItem("study-theme"); } catch (e) {}
   window.applyTheme(saved);
 })();
 </script>
@@ -31,6 +41,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"></script>
 <style>
 @font-face { font-family: "Archivo Black"; src: url(/fonts/archivo-black-latin.woff2) format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Space Grotesk"; src: url(/fonts/space-grotesk-latin.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
@@ -280,6 +292,8 @@ main { max-width: 1240px; margin: 0 auto; padding: calc(var(--gap) + 4px) var(--
 .prompt p { margin: 0 0 .7rem; font-size: 1.06rem; font-weight: 500; }
 .prompt p:last-child { margin-bottom: 0; }
 code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft); padding: .05rem .3rem; border-radius: calc(var(--radius-ctl) / 3); }
+.math { margin: .9rem 0; overflow-x: auto; overflow-y: hidden; }
+.katex { font-size: 1.1em; }
 pre { margin: .9rem 0; background: var(--paper); border: var(--rule) solid var(--line); border-radius: var(--radius-ctl); box-shadow: var(--sh-4); overflow-x: auto; }
 pre code, pre code.hljs { display: block; padding: .85rem 1rem; background: transparent !important; font-size: .92rem; line-height: 1.55; white-space: pre; tab-size: 4; border-radius: 0; }
 .opts { display: grid; gap: .7rem; margin-top: 1.1rem; }
@@ -414,6 +428,21 @@ pre code, pre code.hljs { display: block; padding: .85rem 1rem; background: tran
 .qrow:last-child { border-bottom: 0; }
 .qrow .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .form label.f { display: block; font-size: .9rem; font-weight: 700; margin: 1rem 0 .3rem; }
+.opts .hint { margin: 0 0 -.2rem; }
+.kprim { display: grid; gap: .6rem; margin-top: 1.1rem; }
+.kp { position: relative; display: grid; grid-template-columns: auto 1fr auto; gap: .8rem; align-items: center; border: var(--rule) solid var(--line); border-radius: var(--radius-ctl); background: var(--paper); padding: .55rem .75rem; }
+.kp .n { font-family: var(--display); font-weight: var(--num-weight); color: var(--muted); min-width: 1.2rem; }
+.kp .body { font-weight: 600; min-width: 0; } .kp .body p { margin: 0; } .kp .body pre { margin: .3rem 0 0; }
+.tf { display: flex; gap: .35rem; }
+.tf label { position: relative; cursor: pointer; padding: .3rem .75rem; border: var(--rule) solid var(--line); border-radius: calc(var(--radius-ctl) * .6); background: var(--surface); font-weight: 700; font-size: .9rem; }
+.tf input { position: absolute; opacity: 0; pointer-events: none; }
+.tf label:has(input:checked) { background: var(--strong); color: var(--on-strong); border-color: var(--strong); }
+.tf label:has(input:focus-visible) { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-off); }
+.locked .tf label { cursor: default; }
+.kp.correct { background: var(--accent-soft); border-color: var(--accent); } .kp.wrong { border: var(--wrong); }
+.kp .flag { position: absolute; right: .55rem; top: -.75rem; }
+.numrow { display: flex; gap: .6rem; align-items: center; margin-top: 1.1rem; } .numrow .field { max-width: 16rem; }
+.numrow .unit { font-weight: 700; } .numrow .err:empty { display: none; }
 .optedit { display: grid; grid-template-columns: auto 1fr auto; gap: .6rem; align-items: start; margin-bottom: .6rem; }
 .optedit textarea { min-height: 3rem; padding: .55rem .8rem; }
 .optedit .check { border-radius: 50%; margin-top: .55rem; }
@@ -574,6 +603,53 @@ a.link-btn { font-size: .92rem; }
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const LET = "ABCDEFGH";
+// ---- question types: single, multi (select all that apply), kprim (true/false per statement), numeric, open ----
+const TYPE_NAMES = { single: "Single choice", multi: "Multiple choice", kprim: "Kprim (true/false)", numeric: "Number", open: "Open answer" };
+const TYPE_CHIP = { multi: "select all that apply", kprim: "Kprim", numeric: "number", open: "open answer" };
+// "1'250.5", "1 250,5", "-3/4", "7.7%" -> number; null if it isn't one
+function parseNum(src) {
+  let t = String(src ?? "").trim().replace(/[\s'’_]/g, "").replace(/−/g, "-").replace(/^\+/, "").replace(/%$/, "");
+  if (!t) return null;
+  const frac = t.match(/^(-?[\d.,]+)\/(-?[\d.,]+)$/);
+  if (frac) { const a = parseNum(frac[1]), b = parseNum(frac[2]); return a !== null && b ? a / b : null; }
+  if (t.includes(",") && t.includes(".")) t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  else if (t.includes(",")) t = /^-?\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
+  return /^-?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t) ? parseFloat(t) : null;
+}
+const tolOf = q => typeof q.tolerance === "number" ? q.tolerance : Math.abs(q.answer) * 1e-9;
+const fmtNum = x => typeof x === "number" ? String(+x.toPrecision(12)) : "";
+// What the student gave and whether it is right (correct is null when there is no key or nothing was answered).
+function grade(q, a = {}) {
+  const t = (a.text || "").trim();
+  switch (q.type) {
+    case "single": {
+      const has = a.choice !== undefined;
+      return { has, correct: has && Number.isInteger(q.answer) ? a.choice === q.answer : null,
+        text: has ? `${LET[a.choice]}) ${q.options[a.choice]}` : "", short: has ? LET[a.choice] : "-" };
+    }
+    case "multi": {
+      const c = [...(a.choices || [])].sort((x, y) => x - y), key = Array.isArray(q.answer) ? [...q.answer].sort((x, y) => x - y) : null;
+      return { has: c.length > 0, choices: c, correct: c.length && key ? c.join() === key.join() : null,
+        text: c.map(j => `${LET[j]}) ${q.options[j]}`).join("; "), short: c.map(j => LET[j]).join("") || "-" };
+    }
+    case "kprim": {
+      const tf = q.statements.map((_, j) => a.tf?.[j]), key = Array.isArray(q.answer) ? q.answer : null;
+      const has = tf.some(x => x !== undefined), right = key ? tf.filter((x, j) => x === key[j]).length : null;
+      return { has, tf, right, correct: has && key ? right === key.length : null,
+        text: tf.map((x, j) => `${j + 1} ${x === undefined ? "–" : x ? "true" : "false"}`).join(", "), short: tf.map(x => x === undefined ? "-" : x ? "T" : "F").join("") };
+    }
+    case "numeric": {
+      const v = parseNum(t);
+      return { has: !!t, value: v, correct: t && typeof q.answer === "number" ? v !== null && Math.abs(v - q.answer) <= tolOf(q) : null,
+        text: t + (t && q.unit ? " " + q.unit : ""), short: t ? JSON.stringify(t) : "-" };
+    }
+    default: return { has: !!t, correct: null, text: t, short: JSON.stringify(a.text || "") };
+  }
+}
+const keyText = q => q.type === "single" ? LET[q.answer] : q.type === "multi" ? q.answer.map(j => LET[j]).join(", ")
+  : q.type === "kprim" ? q.answer.map((x, j) => `${j + 1} ${x ? "true" : "false"}`).join(", ")
+  : q.type === "numeric" ? fmtNum(q.answer) + (q.tolerance ? ` ± ${fmtNum(q.tolerance)}` : "") + (q.unit ? " " + q.unit : "") : "";
+const hasKey = q => q.type === "single" ? Number.isInteger(q.answer) : q.type === "numeric" ? typeof q.answer === "number" : Array.isArray(q.answer);
 const GOAL = 12;  // questions per day for a full streak cell
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let toastT;
@@ -609,7 +685,18 @@ function codeBlock(src, lang) {
   el.appendChild(c);
   return el.outerHTML;
 }
-const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+// ---- math: $inline$ and $$display$$ like Obsidian (KaTeX; without it the TeX stays as text) ----
+const MATH = /\$\$([\s\S]+?)\$\$|(?<![\\$])\$(?![\s$])((?:\\.|[^$\\\n])+?)\$(?![\d$])/g;
+function tex(src, display) {
+  if (window.katex) try { return katex.renderToString(src, { displayMode: display, throwOnError: false, strict: "ignore" }); } catch (_) {}
+  return esc(display ? "$$" + src + "$$" : "$" + src + "$");
+}
+const holdMath = (s, hold) => s.replace(MATH, (_, d, i) => hold(d !== undefined ? tex(d.trim(), true) : tex(i, false)));
+function inline(src) {
+  const keep = [], hold = h => `\u0000${keep.push(h) - 1}\u0000`;
+  const s = holdMath(String(src ?? "").replace(/`([^`]+)`/g, (_, c) => hold(`<code>${esc(c)}</code>`)), hold);
+  return esc(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\\\$/g, () => "$").replace(/\u0000(\d+)\u0000/g, (_, n) => keep[+n]);
+}
 function md(text, lang) {
   if (!text) return "";
   const parts = String(text).split(/```(\w*)\n?([\s\S]*?)```/g);
@@ -644,7 +731,7 @@ const ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 const indentOf = l => l.match(/^\s*/)[0].replace(/\t/g, "    ").length;
 const isSep = l => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l || "");
 function startsBlock(l, next) {
-  return /^\s*(```|~~~)/.test(l) || /^#{1,6}\s/.test(l) || /^\s*>/.test(l) || /^\s*([-*_])(\s*\1){2,}\s*$/.test(l) || ITEM.test(l) || (/^\s*\|/.test(l) && isSep(next));
+  return /^\s*(```|~~~|\$\$)/.test(l) || /^#{1,6}\s/.test(l) || /^\s*>/.test(l) || /^\s*([-*_])(\s*\1){2,}\s*$/.test(l) || ITEM.test(l) || (/^\s*\|/.test(l) && isSep(next));
 }
 function dedent(lines) {
   const ind = Math.min(...lines.filter(l => l.trim()).map(indentOf));
@@ -657,6 +744,10 @@ function splitCells(row) {
     const c = row[k];
     if (c === "\\" && row[k + 1] === "|") { cur += "|"; k++; continue; }
     if (c === "`") tick = !tick;
+    if (c === "$" && !tick && row[k - 1] !== "\\") {  // keep $|w|$ in one cell
+      const m = row.slice(k).match(/^\$\$[\s\S]+?\$\$|^\$(?![\s$])(?:\\.|[^$\\])+?\$(?![\d$])/);
+      if (m) { cur += m[0].replace(/\\\|/g, "|"); k += m[0].length - 1; continue; }
+    }
     if (!tick && row.startsWith("[[", k)) wl++;
     if (!tick && wl && row.startsWith("]]", k)) wl--;
     if (c === "|" && !tick && !wl) { out.push(cur.trim()); cur = ""; continue; }
@@ -671,6 +762,7 @@ function inl(src) {
   const keep = [], hold = h => `\u0000${keep.push(h) - 1}\u0000`;
   let s = String(src ?? "");
   s = s.replace(/(`+)([^`][\s\S]*?)\1(?!`)/g, (_, b, c) => hold(`<code>${esc(c)}</code>`));
+  s = holdMath(s, hold);
   s = s.replace(/(!?)\[\[([^\]\n]+?)\]\]/g, (_, bang, inner) => {
     const bar = inner.search(/\\?\|/), target = (bar < 0 ? inner : inner.slice(0, bar)).trim(), alias = bar < 0 ? "" : inner.slice(bar).replace(/^\\?\|/, "").trim();
     if (bang && IMG.test(target)) return hold(`<img src="${esc(apiURL("/api/asset?path=" + encodeURIComponent(target)))}" alt="${esc(alias || target)}" loading="lazy">`);
@@ -691,10 +783,26 @@ function inl(src) {
     .replace(/(^|[^\w])__(?=\S)([\s\S]*?\S)__(?!\w)/g, "$1<strong>$2</strong>")
     .replace(/(^|[^*\w])\*([^\s*](?:[^*\n]*?[^\s*])?)\*(?![*\w])/g, "$1<em>$2</em>")
     .replace(/(^|[^\w])_([^\s_](?:[^_\n]*?[^\s_])?)_(?!\w)/g, "$1<em>$2</em>")
+    .replace(/\\\$/g, () => "$")
     .replace(/~~(?=\S)(.+?)~~/g, "<del>$1</del>")
     .replace(/==(?=\S)(.+?)==/g, "<mark>$1</mark>")
     .replace(/(^|\s)#([\p{L}\p{N}_/-]*[\p{L}_/-][\p{L}\p{N}_/-]*)/gu, '$1<span class="tag">#$2</span>');
   return s.replace(/\u0000(\d+)\u0000/g, (_, n) => keep[+n]);
+}
+// A $$ block: "$$ … $$" on one line, or $$ on its own line up to the line that ends with $$.
+function mathBlock(lines, i) {
+  const m = lines[i].match(/^\s*\$\$(.*)$/);
+  if (!m) return null;
+  const rest = m[1];
+  if (rest.includes("$$")) return /^[^$]*\$\$\s*$/.test(rest) && rest.replace(/\$\$\s*$/, "").trim() ? { src: rest.replace(/\$\$\s*$/, "").trim(), next: i + 1 } : null;
+  const buf = [rest];
+  for (let j = i + 1; j < lines.length; j++) {
+    const e = lines[j].indexOf("$$");
+    if (e >= 0) return lines[j].slice(e + 2).trim() ? null : { src: [...buf, lines[j].slice(0, e)].join("\n").trim(), next: j + 1 };
+    if (!lines[j].trim()) return null;  // a blank line ends the paragraph: not a math block
+    buf.push(lines[j]);
+  }
+  return null;
 }
 function renderMD(src) { return mdBlocks(String(src ?? "").replace(/\r\n?/g, "\n").split("\n")); }
 function mdBlocks(lines) {
@@ -709,6 +817,7 @@ function mdBlocks(lines) {
       while (i < n && !lines[i].trimStart().startsWith(fence)) { buf.push(lines[i].slice(Math.min(ind, indentOf(lines[i])))); i++; }
       i++; out += codeBlock(buf.join("\n"), (m[3] || "").toLowerCase()); continue;
     }
+    if ((m = mathBlock(lines, i))) { out += `<div class="math">${tex(m.src, true)}</div>`; i = m.next; continue; }
     if ((m = l.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/))) { const lv = m[1].length; out += `<h${lv} data-anchor="${esc(anchor(m[2]))}">${inl(m[2])}</h${lv}>`; i++; continue; }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out += "<hr>"; i++; continue; }
     if (/^\s*>/.test(l)) {
@@ -811,7 +920,12 @@ async function showNote(el, path, anc, nav, scroller) {
 function markSection(el, anc, scroller) {
   el.querySelectorAll(".hit").forEach(x => x.classList.remove("hit"));
   const h = anc ? [...el.querySelectorAll("[data-anchor]")].find(x => x.dataset.anchor === anc) : null;
-  if (!h) { (scroller || window).scrollTo(0, 0); return; }
+  if (!h) {  // a new note without a section: show its start, but never move the page more than that
+    if (scroller) { scroller.scrollTop = 0; return; }
+    const top = el.getBoundingClientRect().top;
+    if (top < 0) window.scrollBy(0, top - 16);
+    return;
+  }
   const lv = +h.tagName[1];
   h.classList.add("hit");
   for (let x = h.nextElementSibling; x && !(/^H[1-6]$/.test(x.tagName) && +x.tagName[1] <= lv); x = x.nextElementSibling) x.classList.add("hit");
@@ -885,6 +999,19 @@ function treeHTML() {
       ${ns.map(x => `<li><a href="#" data-path="${esc(x.path)}" class="${x.practice ? "is-practice" : ""}" ${x.path === notesState.path ? 'aria-current="page"' : ""}>${esc(x.title)}</a></li>`).join("")}</ul></details>`;
   }).join("") || `<p class="empty">No note matches.</p>`;
 }
+// Mark the open note in the tree without rebuilding it (a rebuild would reset its scroll and folders).
+function markTree() {
+  const tree = $("#ntree"); if (!tree) return;
+  let cur = null;
+  tree.querySelectorAll("a[data-path]").forEach(a => {
+    const on = a.dataset.path === notesState.path;
+    if (on) { a.setAttribute("aria-current", "page"); cur = a; } else a.removeAttribute("aria-current");
+  });
+  if (!cur) return;
+  const d = cur.closest("details"); if (d) d.open = true;
+  const tr = tree.closest(".tree"), r = cur.getBoundingClientRect(), b = tr.getBoundingClientRect();
+  if (r.top < b.top || r.bottom > b.bottom) tr.scrollTop += r.top - b.top - b.height / 2;
+}
 async function paintNote() {
   const body = $("#nbody");
   const note = await showNote(body, notesState.path, notesState.anchor, openInNotes);
@@ -903,16 +1030,32 @@ function openInNotes(path, anc) {
   setURL({ view: "notes", note: path, ...(anc ? { h: anc } : {}) });
   if (view !== "notes") { view = "notes"; markTab("notes"); return renderNotes(); }
   if (same) return markSection($("#nbody"), notesState.anchor);
-  $("#ntree").innerHTML = treeHTML();
+  markTree();
   paintNote();
 }
 
 // ---- Ask Claude: a short thread per question or note; each message is one headless `claude -p` call ----
 const asks = {};
 const askState = k => asks[k] ||= { msgs: [], draft: "", busy: false, err: "", open: false, ctx: {} };
-const MODEL_NAMES = { sonnet: "Sonnet", opus: "Opus", haiku: "Haiku" };
+const ALIASES = ["sonnet", "opus", "haiku", "fable"];
+const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
+// "claude-opus-4-8" -> "Opus 4.8", "opus" -> "Opus"; anything else is shown as it is.
+function modelName(id) {
+  if (!id) return "";
+  if (ALIASES.includes(id)) return cap(id);
+  const m = /^claude-([a-z]+)-(\d+(?:-\d+)?)(\[1m\])?$/.exec(id);
+  return m ? `${cap(m[1])} ${m[2].replace("-", ".")}${m[3] ? " 1M" : ""}` : id;
+}
 let defaultModel = "sonnet";
-function currentModel() { const m = $("#model"); return (m && m.value) || defaultModel; }
+function modelOptions(ms, extra) {
+  const all = [...ms, ...(extra && !ms.includes(extra) ? [extra] : [])];
+  const latest = all.filter(x => ALIASES.includes(x)), pinned = all.filter(x => !ALIASES.includes(x));
+  const opt = (x, label) => `<option value="${esc(x)}">${esc(label || modelName(x))}</option>`;
+  return (latest.length ? `<optgroup label="Newest of each">${latest.map(x => opt(x, modelName(x) + " (newest)")).join("")}</optgroup>` : "")
+    + (pinned.length ? `<optgroup label="Specific version">${pinned.map(x => opt(x)).join("")}</optgroup>` : "")
+    + `<option value="__other">Other model ID…</option>`;
+}
+function currentModel() { const m = $("#model"); return (m && m.value && m.value !== "__other" && m.value) || defaultModel; }
 function noteAskHTML(note) {
   const k = "n:" + note.path, s = askState(k);
   s.ctx = { note: { path: note.path, anchor: "" } }; s.open = true;
@@ -933,9 +1076,9 @@ function paintAsk(node) {
   node.hidden = !s.open;
   if (!s.open) { node.innerHTML = ""; return; }
   const isNote = k.startsWith("n:");
-  node.innerHTML = `${isNote ? `<h2 class="ask-h">Ask Claude about this note</h2>` : ""}<div class="thread">${s.msgs.map(m => `<div class="msg msg--${m.role}"><p class="meta">${m.role === "user" ? "You" : "Claude " + esc(MODEL_NAMES[m.model] || m.model || "")}</p>
+  node.innerHTML = `${isNote ? `<h2 class="ask-h">Ask Claude about this note</h2>` : ""}<div class="thread">${s.msgs.map(m => `<div class="msg msg--${m.role}"><p class="meta">${m.role === "user" ? "You" : "Claude " + esc(modelName(m.model))}</p>
       <div class="prose">${m.role === "user" ? `<p>${esc(m.text).replace(/\n/g, "<br>")}</p>` : renderMD(m.text)}</div></div>`).join("")}</div>
-    ${s.busy ? `<p class="meta" aria-live="polite" style="margin-top:.7rem"><span class="spin" aria-hidden="true"></span> Claude ${esc(MODEL_NAMES[currentModel()] || "")} is thinking…</p>` : ""}
+    ${s.busy ? `<p class="meta" aria-live="polite" style="margin-top:.7rem"><span class="spin" aria-hidden="true"></span> Claude ${esc(modelName(currentModel()))} is thinking…</p>` : ""}
     ${s.err ? `<p class="small" style="margin-top:.6rem"><span class="err">${esc(s.err)}</span></p>` : ""}
     <form class="askform"><label class="sr-only" for="ask-${esc(k)}">Your question for Claude</label>
       <textarea class="field" id="ask-${esc(k)}" rows="2" placeholder="${s.msgs.length ? "Ask a follow-up" : isNote ? "Ask Claude about this note" : "e.g. Why is my answer wrong?"}">${esc(s.draft)}</textarea>
@@ -962,9 +1105,10 @@ async function sendAsk(k) {
 }
 function questionCtx(q, i) {
   const a = answers[i] || {};
-  const student = q.type === "single" ? (a.choice === undefined ? "(skipped)" : `${LET[a.choice]}) ${q.options[a.choice]}`) : ((a.text || "").trim() || "(left empty)");
-  const question = { area: q.area, id: q.id, prompt: q.prompt, code: q.code, options: q.options, model_answer: q.model_answer, explanation: q.explanation };
-  if (round.reveal && Number.isInteger(q.answer)) question.answer = q.answer;
+  const g = grade(q, a), student = g.has ? g.text : q.type === "open" ? "(left empty)" : "(skipped)";
+  const question = { area: q.area, id: q.id, type: q.type, prompt: q.prompt, code: q.code, options: q.options, statements: q.statements,
+    unit: q.unit, tolerance: q.tolerance, model_answer: q.model_answer, explanation: q.explanation };
+  if (round.reveal && hasKey(q)) question.answer = q.answer;
   return { question, student, note: q.note ? { path: q.note.path, anchor: q.note.anchor } : null };
 }
 
@@ -1033,7 +1177,7 @@ async function renderHome() {
       <div class="section-head"><h2 id="pr-h">Practice</h2><p class="meta">Open concepts come up 4× as often</p></div>
       ${withQs.length ? `<div class="areas">${withQs.map(a => `<label class="area-pick"><input type="checkbox" class="check" value="${a.slug}" ${!preset.size || preset.has(a.slug) ? "checked" : ""}>
           <span>${esc(a.title)}</span><span class="n"><span class="chip">${a.count}</span>${a.unresolved ? `<span class="chip chip--mint" title="open concepts">${a.unresolved} open</span>` : ""}</span></label>`).join("")}</div>
-        <div class="row"><label class="sr-only" for="types">Question type</label><select id="types" class="field" style="width:auto"><option value="">All types</option><option value="single">Single choice</option><option value="open">Open answer</option></select>
+        <div class="row"><label class="sr-only" for="types">Question type</label><select id="types" class="field" style="width:auto"><option value="">All types</option>${Object.entries(TYPE_NAMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
           <button class="btn btn--mint" id="go-bank"><svg aria-hidden="true"><use href="#i-play"/></svg>Start 4-question round</button>
           <button class="btn btn--sm" id="all-none" type="button">Select none</button></div>`
       : `<p class="empty">The bank is empty. Add questions under “Question bank”.</p>`}
@@ -1108,8 +1252,20 @@ function renderRound() {
   $("#quit").onclick = () => { if (locked || confirm("Leave this round? Your answers are lost.")) { round = null; setURL({}); render(); } };
   if (!locked) {
     app.querySelectorAll(".opt input").forEach(inp => inp.onchange = () => {
-      const i = +inp.dataset.q; answers[i] = { choice: +inp.value };
-      app.querySelectorAll(`.opt[data-q="${i}"]`).forEach(o => o.classList.toggle("sel", +o.dataset.o === +inp.value));
+      const i = +inp.dataset.q;
+      if (inp.type === "radio") answers[i] = { choice: +inp.value };
+      else answers[i] = { choices: [...app.querySelectorAll(`.opt input[data-q="${i}"]:checked`)].map(x => +x.value) };
+      app.querySelectorAll(`.opt[data-q="${i}"]`).forEach(o => o.classList.toggle("sel", o.querySelector("input").checked));
+      progressNote();
+    });
+    app.querySelectorAll(".tf input").forEach(inp => inp.onchange = () => {
+      const i = +inp.dataset.q, a = answers[i].tf ? answers[i] : (answers[i] = { tf: [] });
+      a.tf[+inp.dataset.s] = inp.value === "1"; progressNote();
+    });
+    app.querySelectorAll("input[data-num]").forEach(inp => inp.oninput = () => {
+      const i = +inp.dataset.num; answers[i] = { text: inp.value };
+      const v = parseNum(inp.value), hint = app.querySelector(`[data-numhint="${i}"]`);
+      if (hint) hint.textContent = inp.value.trim() && v === null ? "That isn't a number." : "";
       progressNote();
     });
     app.querySelectorAll("textarea[data-q]").forEach(ta => { ta.oninput = () => { answers[+ta.dataset.q] = { text: ta.value }; progressNote(); }; ta.onkeydown = tabKey; });
@@ -1130,37 +1286,56 @@ function renderRound() {
   }
 }
 function progressNote() {
-  const done = answers.filter(a => a.choice !== undefined || (a.text || "").trim()).length;
+  const done = round.questions.filter((q, i) => grade(q, answers[i]).has).length;
   const p = $("#progress"); if (p) p.textContent = `${done} of ${answers.length} answered`;
 }
 function questionHTML(q, i, locked) {
   const a = answers[i] || {};
   let body = "";
-  if (q.type === "single") {
-    body = `<div class="opts" role="radiogroup" aria-label="Options for question ${i + 1}">${q.options.map((o, j) => {
+  const show = locked && round.reveal && hasKey(q);
+  if (q.type === "single" || q.type === "multi") {
+    const many = q.type === "multi", picked = j => many ? (a.choices || []).includes(j) : a.choice === j;
+    const right = j => many ? q.answer.includes(j) : j === q.answer;
+    body = `<div class="opts" role="${many ? "group" : "radiogroup"}" aria-label="Options for question ${i + 1}">${many ? `<p class="hint small meta">Select all that apply.</p>` : ""}${q.options.map((o, j) => {
       let cls = "opt", flag = "";
-      if (a.choice === j) cls += " sel";
-      if (locked && round.reveal && Number.isInteger(q.answer)) {
-        if (j === q.answer) { cls += " correct"; flag = `<span class="chip chip--teal flag">✓ correct</span>`; }
-        else if (a.choice === j) { cls += " wrong"; flag = `<span class="chip flag">✗ your answer</span>`; }
+      if (picked(j)) cls += " sel";
+      if (show) {
+        if (right(j)) { cls += " correct"; flag = `<span class="chip chip--teal flag">${many && !picked(j) ? "✓ missed" : "✓ correct"}</span>`; }
+        else if (picked(j)) { cls += " wrong"; flag = `<span class="chip flag">✗ your answer</span>`; }
       }
-      return `<label class="${cls}" data-q="${i}" data-o="${j}"><input type="radio" name="q${i}" value="${j}" data-q="${i}" ${a.choice === j ? "checked" : ""} ${locked ? "disabled" : ""}>
+      return `<label class="${cls}" data-q="${i}" data-o="${j}"><input type="${many ? "checkbox" : "radio"}" name="q${i}" value="${j}" data-q="${i}" ${picked(j) ? "checked" : ""} ${locked ? "disabled" : ""}>
         <span class="letter" aria-hidden="true">${LET[j]}</span><div class="body">${q.options_code ? codeBlock(String(o), q.lang) : optionHTML(o, q.lang)}</div>${flag}</label>`;
     }).join("")}</div>`;
+  } else if (q.type === "kprim") {
+    body = `<div class="kprim">${q.statements.map((st, j) => {
+      const v = a.tf?.[j]; let cls = "kp", flag = "";
+      if (show) {
+        if (v === q.answer[j]) cls += " correct";
+        else { cls += " wrong"; flag = `<span class="chip flag">✗ it's ${q.answer[j] ? "true" : "false"}</span>`; }
+      }
+      const opt = (val, label) => `<label><input type="radio" name="q${i}s${j}" value="${val ? 1 : 0}" data-q="${i}" data-s="${j}" ${v === val ? "checked" : ""} ${locked ? "disabled" : ""}>${label}</label>`;
+      return `<div class="${cls}" role="radiogroup" aria-label="Statement ${j + 1}"><span class="n">${j + 1}</span><div class="body">${optionHTML(st, q.lang)}</div>
+        <div class="tf">${opt(true, "True")}${opt(false, "False")}</div>${flag}</div>`;
+    }).join("")}</div>`;
+  } else if (q.type === "numeric") {
+    body = `<div class="numrow"><label class="sr-only" for="num${i}">Your answer</label><input class="field mono" id="num${i}" type="text" inputmode="decimal" autocomplete="off" data-num="${i}" value="${esc(a.text || "")}" ${locked ? "disabled" : ""} placeholder="Your answer">${q.unit ? `<span class="unit">${inline(q.unit)}</span>` : ""}<span class="small err" data-numhint="${i}"></span></div>`;
   } else {
     body = `<label class="sr-only" for="ta${i}">Your answer</label><textarea class="field mono" id="ta${i}" rows="7" data-q="${i}" ${locked ? "disabled" : ""} placeholder="Your answer (Tab inserts 4 spaces)">${esc(a.text || "")}</textarea>`;
   }
   let verdict = "";
   if (locked && round.reveal) {
-    if (q.type === "single" && Number.isInteger(q.answer)) {
-      const ok = a.choice === q.answer;
-      verdict = `<div class="verdict ${ok ? "ok" : "bad"}"><strong>${ok ? say("Correct", "Nice") : a.choice === undefined ? "Skipped" : say("Not quite", "Not this time")}</strong> · answer ${LET[q.answer]}${q.explanation ? md(q.explanation, q.lang) : ""}</div>`;
+    if (show) {
+      const g = grade(q, a), ok = g.correct === true;
+      let extra = "";
+      if (q.type === "kprim" && g.has) extra = ` · ${g.right} of ${q.answer.length} right` + (q.answer.length === 4 ? ` (Kprim: ${g.right === 4 ? "full points" : g.right === 3 ? "half points" : "no points"})` : "");
+      if (q.type === "numeric" && g.has && g.value === null) extra = " · that isn't a number";
+      verdict = `<div class="verdict ${ok ? "ok" : "bad"}"><strong>${ok ? say("Correct", "Nice") : !g.has ? "Skipped" : say("Not quite", "Not this time")}</strong> · answer ${inline(keyText(q))}${extra}${q.explanation ? md(q.explanation, q.lang) : ""}</div>`;
     } else if (q.type === "open" && (q.model_answer || q.explanation)) {
       verdict = `<div class="verdict open"><strong>Model answer</strong>${md(q.model_answer || "", q.lang)}${q.explanation ? md(q.explanation, q.lang) : ""}${gradeBox(q, i)}</div>`;
     }
   }
   return `<section class="block qcard ${locked ? "locked" : ""}" aria-label="Question ${i + 1}"><div class="qhead"><span class="qnum">Q${i + 1}</span>
-    ${q.area ? `<span class="chip">${esc(areaTitle(q.area))}</span>` : ""}${q.type === "open" ? `<span class="chip chip--mint">open answer</span>` : ""}
+    ${q.area ? `<span class="chip">${esc(areaTitle(q.area))}</span>` : ""}${TYPE_CHIP[q.type] ? `<span class="chip chip--mint">${TYPE_CHIP[q.type]}</span>` : ""}
     ${locked && q.concept ? `<span class="chip chip--mint">${esc(q.concept)}</span>` : ""}</div>
     <div class="prompt">${md(q.prompt, q.lang)}</div>${q.code ? codeBlock(q.code, q.lang || "python") : ""}${body}${verdict}${locked ? questionFoot(q, i) : ""}</section>`;
 }
@@ -1181,7 +1356,7 @@ function gradeBox(q, i) {
     const by = sa.graded_by === "claude" ? "checked by Claude" : "your call";
     return `<div class="graded ${sa.correct ? "is-right" : "is-wrong"}"><strong>${sa.correct ? say("Right", "You had it") : say("Not quite", "Not this time")}</strong> · ${by}${sa.feedback ? `<p>${inline(sa.feedback)}</p>` : ""}</div>`;
   }
-  if (sa._busy) return `<div class="selfgrade" aria-live="polite"><span class="spin" aria-hidden="true"></span><span class="meta">Claude ${esc(MODEL_NAMES[currentModel()] || "")} is reading your answer…</span></div>`;
+  if (sa._busy) return `<div class="selfgrade" aria-live="polite"><span class="spin" aria-hidden="true"></span><span class="meta">Claude ${esc(modelName(currentModel()))} is reading your answer…</span></div>`;
   return `<div class="selfgrade"><p class="meta">Compare your answer with the model answer${claudeCheck ? ", or let Claude check it" : ""}. Either way it goes into your concept tracker.</p>
     <button class="btn btn--sm btn--mint" data-grade="right" data-q="${i}"><svg aria-hidden="true"><use href="#i-check"/></svg>I had it</button>
     <button class="btn btn--sm" data-grade="wrong" data-q="${i}"><svg aria-hidden="true"><use href="#i-x"/></svg>I missed it</button>
@@ -1208,17 +1383,20 @@ function buildResults() {
     round_id: round.id, source: round.source, title: round.title || "",
     answers: round.questions.map((q, i) => {
       const a = answers[i], base = { n: i + 1, id: q.id, area: q.area || null, concept: q.concept || null, type: q.type };
+      const g = grade(q, a), key = hasKey(q) ? q.answer : null;
       if (q.type === "single") {
-        const has = a.choice !== undefined;
-        return { ...base, choice: has ? a.choice : null, choice_letter: has ? LET[a.choice] : null, choice_text: has ? q.options[a.choice] : null,
-          answer: Number.isInteger(q.answer) ? q.answer : null, correct: Number.isInteger(q.answer) && has ? a.choice === q.answer : null };
+        return { ...base, choice: g.has ? a.choice : null, choice_letter: g.has ? LET[a.choice] : null, choice_text: g.has ? q.options[a.choice] : null,
+          answer: key, correct: g.correct };
       }
+      if (q.type === "multi") return { ...base, choices: g.has ? g.choices : null, choice_letters: g.has ? g.short : null, choice_text: g.has ? g.text : null, answer: key, correct: g.correct };
+      if (q.type === "kprim") return { ...base, tf: g.tf.map(x => x ?? null), choice_text: g.has ? g.text : null, right: g.right, answer: key, correct: g.correct };
+      if (q.type === "numeric") return { ...base, text: a.text || "", value: g.value, choice_text: g.has ? g.text : null, answer: key, correct: g.correct };
       return { ...base, text: a.text || "", correct: null };
     }),
   };
 }
 function pasteString() {
-  const parts = submitted.answers.map(a => a.type === "single" ? `${a.n}=${a.choice_letter || "-"}` : `${a.n}=${JSON.stringify(a.text)}`);
+  const parts = submitted.answers.map((a, i) => `${a.n}=${grade(round.questions[i], answers[i]).short}`);
   return `STUDY round=${round.id} | ${parts.join(" | ")}`;
 }
 async function saveSubmitted() {
@@ -1228,7 +1406,7 @@ async function saveSubmitted() {
   await loadProgress();
 }
 async function submit() {
-  const missing = answers.findIndex(a => a.choice === undefined && !(a.text || "").trim());
+  const missing = round.questions.findIndex((q, i) => q.type === "kprim" ? grade(q, answers[i]).tf.includes(undefined) : !grade(q, answers[i]).has);
   if (missing >= 0 && !confirm(`Q${missing + 1} is unanswered. Submit anyway?`)) return;
   submitted = buildResults();
   await saveSubmitted();
@@ -1379,24 +1557,43 @@ function openEditor(idx) {
   bankState.editing = idx === null ? "new" : idx;
   const q = idx === null ? { id: nextId(b), type: "single", lang: "python", difficulty: "medium", prompt: "", code: "", options: ["", "", "", ""], answer: 0 } : JSON.parse(JSON.stringify(b.questions[idx]));
   q.options = q.options || ["", "", "", ""];
+  q.statements = q.statements || ["", "", "", ""];
   const ed = $("#editor");
+  const isChoice = () => q.type === "single" || q.type === "multi";
+  // switching type: carry over what fits
+  const retype = t => {
+    if (t === q.type) return;
+    const was = q.type; q.type = t;
+    if (t === "single") q.answer = Array.isArray(q.answer) && was === "multi" ? (q.answer[0] ?? 0) : Number.isInteger(q.answer) ? q.answer : 0;
+    else if (t === "multi") q.answer = Number.isInteger(q.answer) ? [q.answer] : Array.isArray(q.answer) && was === "multi" ? q.answer : [0];
+    else if (t === "kprim") q.answer = q.statements.map(() => true);
+    else if (t === "numeric") q.answer = null;
+  };
   const draw = () => {
     ed.innerHTML = `<section class="block form">
       <div class="section-head"><h2>${idx === null ? "New question" : "Edit " + esc(q.id)}</h2><div class="row">
         ${idx !== null ? `<button class="btn btn--sm" id="del">Delete</button>` : ""}<button class="btn btn--sm" id="cancel">Close</button><button class="btn btn--mint btn--sm" id="save">Save</button></div></div>
       <div class="row" style="align-items:flex-start">
-        <div class="grow" style="min-width:140px"><label class="f" for="f-type">Type</label><select class="field" id="f-type"><option value="single">Single choice</option><option value="open">Open answer</option></select></div>
+        <div class="grow" style="min-width:140px"><label class="f" for="f-type">Type</label><select class="field" id="f-type">${Object.entries(TYPE_NAMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
         <div class="grow" style="min-width:120px"><label class="f" for="f-lang">Language</label><select class="field" id="f-lang"><option>python</option><option>java</option><option value="">none</option></select></div>
         <div class="grow" style="min-width:120px"><label class="f" for="f-diff">Difficulty</label><select class="field" id="f-diff"><option>easy</option><option>medium</option><option>hard</option></select></div></div>
       <label class="f" for="f-concept">Concept (a row name in concepts/${esc(b.area)}.md; hidden until graded, and used for tracking)</label><input class="field" type="text" id="f-concept" value="${esc(q.concept || "")}">
       <label class="f" for="f-prompt">Prompt (supports \`inline\` and \`\`\` fences)</label><textarea class="field" id="f-prompt" rows="3">${esc(q.prompt || "")}</textarea>
       <label class="f" for="f-code">Code (indentation kept exactly)</label><textarea class="field mono" id="f-code" rows="8">${esc(q.code || "")}</textarea>
-      <div id="f-single" ${q.type === "open" ? "hidden" : ""}><p class="f" style="font-weight:700;margin:1rem 0 .3rem">Options (tick the correct one; multi-line options render as code)</p>
+      ${isChoice() ? `<div id="f-single"><p class="f" style="font-weight:700;margin:1rem 0 .3rem">Options (tick the correct ${q.type === "multi" ? "ones" : "one"}; multi-line options render as code)</p>
         <label class="small" style="display:flex;gap:.6rem;align-items:center;margin-bottom:.7rem;font-weight:600"><input type="checkbox" class="check" id="f-optcode" ${q.options_code ? "checked" : ""}> Render all options as code (e.g. program output)</label>
-        ${q.options.map((o, j) => `<div class="optedit"><input type="radio" class="check" name="f-ans" value="${j}" aria-label="Option ${LET[j]} is correct" ${q.answer === j ? "checked" : ""}>
+        ${q.options.map((o, j) => `<div class="optedit"><input type="${q.type === "multi" ? "checkbox" : "radio"}" class="check" name="f-ans" value="${j}" aria-label="Option ${LET[j]} is correct" ${(q.type === "multi" ? (q.answer || []).includes(j) : q.answer === j) ? "checked" : ""}>
           <textarea class="field mono" data-opt="${j}" rows="1" aria-label="Option ${LET[j]}">${esc(o)}</textarea><button class="icon-btn" data-rm="${j}" aria-label="Remove option ${LET[j]}"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>`).join("")}
-        <button class="btn btn--sm" id="addopt"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add option</button></div>
-      <div id="f-open" ${q.type === "single" ? "hidden" : ""}><label class="f" for="f-model">Model answer</label><textarea class="field mono" id="f-model" rows="4">${esc(q.model_answer || "")}</textarea></div>
+        <button class="btn btn--sm" id="addopt"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add option</button></div>` : ""}
+      ${q.type === "kprim" ? `<div id="f-kprim"><p class="f" style="font-weight:700;margin:1rem 0 .3rem">Statements (usually 4; set each one true or false)</p>
+        ${q.statements.map((st, j) => `<div class="optedit"><select class="field" data-tf="${j}" aria-label="Statement ${j + 1} is" style="width:auto"><option value="true" ${q.answer?.[j] !== false ? "selected" : ""}>true</option><option value="false" ${q.answer?.[j] === false ? "selected" : ""}>false</option></select>
+          <textarea class="field" data-st="${j}" rows="1" aria-label="Statement ${j + 1}">${esc(st)}</textarea><button class="icon-btn" data-rmst="${j}" aria-label="Remove statement ${j + 1}"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>`).join("")}
+        <button class="btn btn--sm" id="addst"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add statement</button></div>` : ""}
+      ${q.type === "numeric" ? `<div class="row" style="align-items:flex-start">
+        <div class="grow" style="min-width:140px"><label class="f" for="f-num">Correct answer</label><input class="field mono" type="text" inputmode="decimal" id="f-num" value="${esc(typeof q.answer === "number" ? fmtNum(q.answer) : q._num || "")}"></div>
+        <div class="grow" style="min-width:120px"><label class="f" for="f-tol">Tolerance (±, empty = exact)</label><input class="field mono" type="text" inputmode="decimal" id="f-tol" value="${esc(typeof q.tolerance === "number" ? fmtNum(q.tolerance) : "")}"></div>
+        <div class="grow" style="min-width:100px"><label class="f" for="f-unit">Unit</label><input class="field" type="text" id="f-unit" value="${esc(q.unit || "")}" placeholder="e.g. CHF, %"></div></div>` : ""}
+      ${q.type === "open" ? `<div id="f-open"><label class="f" for="f-model">Model answer</label><textarea class="field mono" id="f-model" rows="4">${esc(q.model_answer || "")}</textarea></div>` : ""}
       <label class="f" for="f-expl">Explanation (shown after grading, and used as the key point in error notes)</label><textarea class="field" id="f-expl" rows="3">${esc(q.explanation || "")}</textarea>
       <label class="f" for="f-src">Source</label><input class="field" type="text" id="f-src" value="${esc(q.source || "")}" placeholder="e.g. HS24 exam OA.3">
       <label class="f" for="f-ref">Note section (Note title#Heading; leave empty to pick it automatically)</label><input class="field" type="text" id="f-ref" value="${esc(q.ref || "")}" placeholder="finding the best section…">
@@ -1406,11 +1603,19 @@ function openEditor(idx) {
     $("#f-type").value = q.type; $("#f-lang").value = q.lang ?? "python"; $("#f-diff").value = q.difficulty || "medium";
     ed.querySelectorAll("textarea.mono").forEach(t => t.onkeydown = tabKey);
     ed.oninput = ed.onchange = () => { read(); preview(); };
-    $("#f-type").onchange = () => { read(); draw(); };
-    $("#addopt").onclick = () => { read(); q.options.push(""); draw(); };
+    $("#f-type").onchange = () => { const t = $("#f-type").value; $("#f-type").value = q.type; read(); retype(t); draw(); };
+    if ($("#addopt")) $("#addopt").onclick = () => { read(); if (q.options.length < 8) q.options.push(""); draw(); };
+    if ($("#addst")) $("#addst").onclick = () => { read(); if (q.statements.length < 8) { q.statements.push(""); q.answer.push(true); } draw(); };
     ed.querySelectorAll("[data-rm]").forEach(btn => btn.onclick = () => {
       read(); const j = +btn.dataset.rm; if (q.options.length <= 2) return;
-      q.options.splice(j, 1); if (q.answer >= q.options.length || q.answer === j) q.answer = 0; else if (q.answer > j) q.answer--; draw();
+      q.options.splice(j, 1);
+      if (q.type === "multi") { q.answer = q.answer.filter(x => x !== j).map(x => x > j ? x - 1 : x); if (!q.answer.length) q.answer = [0]; }
+      else if (q.answer >= q.options.length || q.answer === j) q.answer = 0; else if (q.answer > j) q.answer--;
+      draw();
+    });
+    ed.querySelectorAll("[data-rmst]").forEach(btn => btn.onclick = () => {
+      read(); const j = +btn.dataset.rmst; if (q.statements.length <= 2) return;
+      q.statements.splice(j, 1); q.answer.splice(j, 1); draw();
     });
     $("#cancel").onclick = () => { bankState.editing = null; ed.innerHTML = ""; };
     $("#save").onclick = save;
@@ -1428,14 +1633,29 @@ function openEditor(idx) {
     q.type = $("#f-type").value; q.lang = $("#f-lang").value; q.difficulty = $("#f-diff").value;
     q.concept = $("#f-concept").value.trim(); q.prompt = $("#f-prompt").value; q.code = $("#f-code").value.replace(/\s+$/, "");
     q.explanation = $("#f-expl").value; q.source = $("#f-src").value.trim(); q.ref = $("#f-ref").value.trim();
-    q.options = [...ed.querySelectorAll("[data-opt]")].map(t => t.value);
-    const ans = ed.querySelector("input[name=f-ans]:checked"); q.answer = ans ? +ans.value : 0;
-    q.model_answer = $("#f-model").value; q.options_code = $("#f-optcode").checked || undefined;
+    if (isChoice()) {
+      q.options = [...ed.querySelectorAll("[data-opt]")].map(t => t.value);
+      const ticked = [...ed.querySelectorAll("input[name=f-ans]:checked")].map(x => +x.value);
+      q.answer = q.type === "multi" ? ticked : (ticked[0] ?? 0);
+      q.options_code = $("#f-optcode").checked || undefined;
+    }
+    if (q.type === "kprim") {
+      q.statements = [...ed.querySelectorAll("[data-st]")].map(t => t.value);
+      q.answer = [...ed.querySelectorAll("[data-tf]")].map(x => x.value === "true");
+    }
+    if (q.type === "numeric") {
+      q._num = $("#f-num").value; const v = parseNum(q._num), tol = parseNum($("#f-tol").value);
+      q.answer = v ?? (q._num.trim() ? q._num : null); q.tolerance = tol ?? undefined; q.unit = $("#f-unit").value.trim();
+    }
+    if (q.type === "open") q.model_answer = $("#f-model").value;
   };
   const clean = () => {
     const o = { ...q };
-    for (const k of Object.keys(o)) if (o[k] === "" || o[k] === undefined) delete o[k];
-    if (o.type === "open") { delete o.options; delete o.answer; delete o.options_code; } else delete o.model_answer;
+    delete o._num;
+    for (const k of Object.keys(o)) if (o[k] === "" || o[k] === undefined || o[k] === null) delete o[k];
+    const own = { single: ["options", "answer", "options_code"], multi: ["options", "answer", "options_code"], kprim: ["statements", "answer"],
+      numeric: ["answer", "tolerance", "unit"], open: ["model_answer"] }[o.type] || [];
+    for (const k of ["options", "answer", "options_code", "statements", "tolerance", "unit", "model_answer"]) if (!own.includes(k)) delete o[k];
     return o;
   };
   const preview = () => {
@@ -1472,11 +1692,25 @@ function setURL(extra) { history.replaceState(null, "", "?" + new URLSearchParam
   claudeCheck = vaults.some(v => v.claude_check);
   defaultModel = vaults[0]?.default_model || "sonnet";
   if (claudeCheck) {
-    const ms = vaults[0]?.models || ["sonnet", "opus", "haiku"], m = $("#model");
-    m.innerHTML = ms.map(x => `<option value="${esc(x)}">${esc(MODEL_NAMES[x] || x)}</option>`).join("");
-    let savedM = null; try { savedM = localStorage.getItem("study-model"); } catch (_) {}
-    m.value = ms.includes(savedM) ? savedM : defaultModel;
-    m.onchange = () => { try { localStorage.setItem("study-model", m.value); } catch (_) {} toast("Claude " + (MODEL_NAMES[m.value] || m.value) + " answers from now on"); };
+    const ms = vaults[0]?.models || ALIASES, m = $("#model");
+    const okId = x => typeof x === "string" && (ms.includes(x) || ALIASES.includes(x) || /^claude-[a-z0-9][a-z0-9.-]{0,60}(\[1m\])?$/.test(x));
+    let savedM = (window.STUDY_PREFS || {}).model || null;
+    if (!savedM) try { savedM = localStorage.getItem("study-model"); } catch (_) {}
+    let cur = okId(savedM) ? savedM : defaultModel;
+    m.innerHTML = modelOptions(ms, cur); m.value = cur;
+    m.onchange = () => {
+      let id = m.value;
+      if (id === "__other") {
+        const typed = (prompt("Claude model ID, for example claude-opus-4-8 or claude-sonnet-4-6:", ms.includes(cur) ? "" : cur) || "").trim().toLowerCase();
+        if (!typed) { m.value = cur; return; }
+        if (!okId(typed)) { m.value = cur; return toast("That isn't a Claude model ID (they start with claude-)"); }
+        id = typed; m.innerHTML = modelOptions(ms, id);
+      }
+      cur = id; m.value = id;
+      try { localStorage.setItem("study-model", id); } catch (_) {}
+      savePref({ model: id });
+      toast("Claude " + modelName(id) + " answers from now on");
+    };
     $("#modelpick").hidden = false;
   }
   let saved = null; try { saved = localStorage.getItem("study-vault"); } catch (_) {}

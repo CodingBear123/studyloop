@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -34,8 +35,22 @@ FONT_NAMES = {p.name for p in (HERE / "fonts").glob("*.woff2")}
 # one-off headless Claude Code call (`claude -p`, no tools, no session saved). Nothing runs in
 # the background: each check is one short process.
 CLAUDE = os.environ.get("STUDY_CLAUDE") or shutil.which("claude")
-MODELS = ("sonnet", "opus", "haiku")
+# Aliases follow the newest model of a family; the full IDs pin one version. STUDY_CLAUDE_MODELS
+# (comma-separated) replaces the list, and the page also takes any other "claude-..." ID.
+ALIASES = ("sonnet", "opus", "haiku", "fable")
+DEFAULT_MODELS = ALIASES + (
+    "claude-fable-5-2", "claude-fable-5-1",
+    "claude-opus-5-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
+    "claude-sonnet-5-5", "claude-sonnet-5", "claude-sonnet-4-6",
+    "claude-haiku-5-5", "claude-haiku-4-5",
+)
+MODELS = tuple(m.strip() for m in os.environ.get("STUDY_CLAUDE_MODELS", "").split(",") if m.strip()) or DEFAULT_MODELS
+MODEL_ID_RE = re.compile(r"^claude-[a-z0-9][a-z0-9.\-]{0,60}(\[1m\])?$")
 CLAUDE_MODEL = os.environ.get("STUDY_CLAUDE_MODEL", "sonnet")
+THEMES = ("tide", "dark", "garden")
+# Theme and model live here too, not only in the browser: localStorage is per address, so
+# 127.0.0.1:8765, localhost:8765 and another port would each forget the choice.
+PREFS_FILE = Path(os.environ.get("STUDY_PREFS") or Path.home() / ".config" / "claude-study" / "prefs.json")
 GRADE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -48,8 +63,52 @@ GRADE_SCHEMA = {
 }
 
 
+def valid_model(model):
+    return isinstance(model, str) and (model in MODELS or model in ALIASES or bool(MODEL_ID_RE.match(model)))
+
+
 def pick_model(model):
-    return model if model in MODELS else CLAUDE_MODEL
+    return model if valid_model(model) else CLAUDE_MODEL
+
+
+def raw_prefs():
+    """The whole prefs file (launch.py keeps the notes folder there too)."""
+    try:
+        d = json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def read_prefs():
+    """What the page may see and set: theme and model."""
+    return clean_prefs(raw_prefs())
+
+
+def clean_prefs(d):
+    out = {}
+    if d.get("theme") in THEMES:
+        out["theme"] = d["theme"]
+    if valid_model(d.get("model")):
+        out["model"] = d["model"]
+    return out
+
+
+def write_prefs(d):
+    prefs = {**raw_prefs(), **clean_prefs(d if isinstance(d, dict) else {})}
+    try:
+        PREFS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PREFS_FILE.write_text(json.dumps(prefs, indent=2) + "\n", encoding="utf-8")
+    except OSError as e:
+        raise ValueError(f"couldn't save preferences: {e}")
+    return clean_prefs(prefs)
+
+
+def index_html():
+    """index.html with the saved preferences inlined, so the theme is right before first paint."""
+    prefs = json.dumps(read_prefs()).replace("<", "\\u003c")
+    html = (HERE / "index.html").read_text(encoding="utf-8")
+    return html.replace("<!--STUDY_PREFS-->", f"<script>window.STUDY_PREFS = {prefs};</script>", 1)
 
 
 def run_claude(prompt, model=None, schema=None, timeout=120):
@@ -88,11 +147,26 @@ def question_text(q):
     parts = ["QUESTION:", str(q.get("prompt") or "")]
     if q.get("code"):
         parts += ["", "CODE:", str(q["code"])]
-    opts = q.get("options") or []
+    opts, ans, L = q.get("options") or [], q.get("answer"), "ABCDEFGH"
     if isinstance(opts, list) and opts:
-        parts += ["", "OPTIONS:"] + [f"{'ABCDEFGH'[i]}) {o}" for i, o in enumerate(opts[:8])]
-        if isinstance(q.get("answer"), int) and 0 <= q["answer"] < len(opts):
-            parts += [f"CORRECT OPTION: {'ABCDEFGH'[q['answer']]}"]
+        many = q.get("type") == "multi"
+        parts += ["", "OPTIONS (select all that apply):" if many else "OPTIONS:"]
+        parts += [f"{L[i]}) {o}" for i, o in enumerate(opts[:8])]
+        if isinstance(ans, int) and not isinstance(ans, bool) and 0 <= ans < len(opts):
+            parts += [f"CORRECT OPTION: {L[ans]}"]
+        elif many and isinstance(ans, list):
+            parts += ["CORRECT OPTIONS: " + ", ".join(L[a] for a in ans if isinstance(a, int) and 0 <= a < len(opts))]
+    sts = q.get("statements") or []
+    if isinstance(sts, list) and sts:
+        parts += ["", "STATEMENTS (Kprim: judge each one true or false):"] + [f"{i + 1}. {x}" for i, x in enumerate(sts[:8])]
+        if isinstance(ans, list) and len(ans) == len(sts):
+            parts += ["CORRECT: " + ", ".join(f"{i + 1} {'true' if a else 'false'}" for i, a in enumerate(ans))]
+    if q.get("type") == "numeric":
+        unit = f" {q['unit']}" if q.get("unit") else ""
+        parts += ["", f"ANSWER IS A NUMBER{(' in' + unit) if unit else ''}."]
+        if isinstance(ans, (int, float)) and not isinstance(ans, bool):
+            tol = q.get("tolerance")
+            parts += [f"CORRECT ANSWER: {ans}{unit}" + (f" (± {tol})" if tol else "")]
     return parts
 
 
@@ -212,13 +286,21 @@ class App:
                     break
             else:
                 picked.append(pool.pop()[1])
-        for q in picked:  # shuffle options, remap the answer index
-            if q.get("type") == "single" and q.get("shuffle", True):
+        for q in picked:  # shuffle options or statements, remap the answer
+            if not q.get("shuffle", True):
+                continue
+            if q.get("type") in ("single", "multi"):
                 order = list(range(len(q["options"])))
                 random.shuffle(order)
                 q["options"] = [q["options"][i] for i in order]
                 if isinstance(q.get("answer"), int):
                     q["answer"] = order.index(q["answer"])
+                elif isinstance(q.get("answer"), list):
+                    q["answer"] = sorted(order.index(a) for a in q["answer"])
+            elif q.get("type") == "kprim" and isinstance(q.get("answer"), list):
+                pairs = list(zip(q["statements"], q["answer"]))
+                random.shuffle(pairs)
+                q["statements"], q["answer"] = [p[0] for p in pairs], [p[1] for p in pairs]
         return {"id": datetime.now().strftime("bank-%Y%m%d-%H%M%S"), "source": "bank",
                 "title": ", ".join(self.v.title(s) for s in slugs), "reveal": True,
                 "questions": self.with_notes(picked)}
@@ -254,19 +336,20 @@ class App:
         return str(res / f"{rid}.json")
 
     def track(self, data):
-        """Bank rounds carry their answer key, so the server records their single-choice answers.
+        """Bank rounds carry their answer key, so the server records the answers the page graded
+        (single, multi, kprim, numeric).
 
         Each recorded answer gets "recorded": true. "tracked" is true only when nothing is left
         for Claude to grade (no answered open questions)."""
         graded, hits = [], []
         for a in data.get("answers", []):
             area, concept = a.get("area") or "", (a.get("concept") or "").strip()
-            if a.get("type") != "single" or a.get("correct") is None or not concept or not self.v.area(area):
+            if a.get("type") == "open" or a.get("correct") is None or not concept or not self.v.area(area):
                 continue
             q = self.v.bank_question(area, a.get("id")) or {}
             picked = (a.get("choice_text") or "").strip().replace("\n", " ⏎ ")
             graded.append({"area": area, "concept": concept, "correct": bool(a["correct"]),
-                           "confusion": f"picked `{picked[:120]}` in a practice round." if picked
+                           "confusion": f"answered `{picked[:120]}` in a practice round." if picked
                            else "left it unanswered.",
                            "key_point": sv.plain(q.get("explanation"))
                            or f"see {a.get('id')} in question-bank/{area}.json"})
@@ -342,7 +425,8 @@ class App:
         q = data.get("question") if isinstance(data.get("question"), dict) else None
         if q:  # the page's copy wins (its options may be shuffled); the bank fills in what is missing
             bq = self.v.bank_question(q.get("area") or "", q.get("id") or "") if q.get("id") else None
-            keep = ("prompt", "code", "options", "answer", "model_answer", "explanation")
+            keep = ("type", "prompt", "code", "options", "statements", "unit", "tolerance", "answer", "model_answer",
+                    "explanation")
             given = {k: q[k] for k in keep if q.get(k) not in (None, "", [])}
             if bq and "options" not in given and "prompt" not in given:
                 given = dict(bq)
@@ -431,7 +515,7 @@ def make_handler(vaults):
             p = url.path
             try:
                 if method == "GET" and p in ("/", "/index.html"):
-                    return self.send(200, (HERE / "index.html").read_bytes(), "text/html")
+                    return self.send(200, index_html(), "text/html")
                 if method == "GET" and p.startswith("/fonts/"):
                     name = p.rsplit("/", 1)[-1]
                     if name in FONT_NAMES:
@@ -441,6 +525,11 @@ def make_handler(vaults):
                     return self.send(200, [{"id": k, "path": str(a.vault), "subject": a.v.manifest.get("subject"),
                                             "claude_check": bool(CLAUDE), "models": list(MODELS),
                                             "default_model": pick_model(CLAUDE_MODEL)} for k, a in vaults.items()])
+                if p == "/api/prefs":
+                    if method == "GET":
+                        return self.send(200, read_prefs())
+                    if method == "PUT":
+                        return self.send(200, write_prefs(self.body()))
                 app = pick(q) if p.startswith("/api/") else None
                 if method == "GET" and p == "/api/areas":
                     return self.send(200, app.areas())

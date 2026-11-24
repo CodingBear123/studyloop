@@ -48,7 +48,16 @@ Reuse an existing row name when it fits. No `|` characters.
 
 ## Format
 
-- Single choice: 4 options (2–8 allowed), one right.
-- Open answer: free text, graded by you against the notes and the bank's `model_answer`.
+Pick the type that tests the concept best, and mirror the old exams: if they use Kprim, use Kprim.
+
+| Type | Use it for | Rules |
+|---|---|---|
+| `single` | one best answer, output prediction, "which of these" | 4 options (2–8), one right |
+| `multi` | "select all that apply" | 4–6 options, 1 to all-but-one right; vary how many, so the count gives nothing away |
+| `kprim` | four related claims about one object (Swiss Kprim) | 4 statements, each true or false; mix them (never all true or all false in a row of rounds); each statement must be clearly true or false on its own |
+| `numeric` | calculations with one result | the number only; set `unit` and a `tolerance` for rounding (e.g. 0.01 for 2 decimals); say in the prompt how to round |
+| `open` | explain, compare, write code, proofs | free text, graded by you against the notes and the bank's `model_answer` |
+
+In a round of 4, use at least two types when the area allows it.
 - Code goes in `code` or in fenced blocks, never squashed onto one line. Set `lang`.
 - Program output as options: set `options_code: true`.

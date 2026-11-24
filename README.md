@@ -1,6 +1,7 @@
 # Claude Study Tool
 
-Two agent skills and a local quiz page for studying from an Obsidian **StudyVault**.
+Two agent skills and a local quiz page for studying from a **StudyVault**, a folder of Markdown notes that
+also opens as an Obsidian vault.
 
 | Command | What it does |
 |---|---|
@@ -10,38 +11,105 @@ Two agent skills and a local quiz page for studying from an Obsidian **StudyVaul
 Both write vault data only through `skills/study/app/studyvault.py`, so the trackers, dashboard and question
 bank never drift apart. `studyvault.py check` proves it.
 
+## How it works
+
+```
+  Course material                 StudyVault/                        Study page
+                                                                  (local website)
++------------------+         +--------------------+         +--------------------------+
+| slides, PDFs,    | /study- | notes per area,    | reads   | Quiz: answer rounds      |
+| old exams,       |-------->| question bank,     |<------->| Notes: read, Ask Claude  |
+| your notes       |  vault  | concept trackers,  | saves   | Progress                 |
+|                  |         | rounds, results    |         | Question bank: edit      |
++------------------+         +--------------------+         +--------------------------+
+                                        ^                                 |
+                                        | /study: writes                  | checks open
+                                        | rounds, grades,                 | answers,
+                                        | records                         | Ask Claude
+                             +--------------------+                       |
+                             |    Claude Code     |<----------------------+
+                             +--------------------+
+```
+
+1. **Build the vault.** In Claude Code, open your course folder and type `/study-vault`. Claude reads your
+   slides, PDFs and old exams and writes a `StudyVault/`: one folder of notes per topic area, an exam blueprint
+   (what the exam asks and how), practice questions, a question bank and an empty concept tracker per area.
+   Old exams decide how you get asked, not what: the scope is what your course material covers.
+2. **Study.** Type `/study`. Claude picks a session from your progress (diagnostic, drill your weak spots,
+   one area, exam simulation, or a timed plan) and writes a round. You answer it on the **study page**: a small
+   website that runs only on your computer (`http://127.0.0.1:8765`) and reads and saves the vault directly.
+   Code keeps its indentation there and formulas render. Open it any time with the Claude Study app, also
+   without Claude: practice rounds from the question bank, your notes, your progress.
+3. **Track.** Claude grades the round, explains every miss with a link to the note section to reread, and
+   records each answer in the concept tracker: 🔴 concepts you got wrong, 🟢 once you get them right. The next
+   round targets the 🔴 ones. Practice rounds you start on the page are graded by the page and recorded the
+   same way; for open answers it can ask Claude for a check, and every question and note has an "Ask Claude"
+   button. (The page calls Claude Code in the background for these, so they need it installed and signed in.)
+
+The vault is plain Markdown, so you can also read and edit it in [Obsidian](https://obsidian.md) or any editor.
+
 ## Install
 
-Any agent that reads Agent Skills (Claude Code, Codex, Cursor, Gemini CLI, Copilot, OpenCode, …):
+You need [Claude Code](https://claude.com/claude-code) (the installer offers to set it up) and a Claude
+account. Everything else the installer checks and sets up for you.
+
+[Obsidian](https://obsidian.md) is optional. The vault is ordinary Markdown, and the study page shows the notes
+itself. If you like Obsidian, open the folder that contains `StudyVault/` as a vault there.
+
+**Mac**
+
+1. On GitHub, click **Code → Download ZIP** and open the ZIP (or `git clone` the repository).
+2. In the unpacked folder, right-click **Install on Mac.command** → **Open** → **Open**. (Right-click only the
+   first time: macOS doesn't open downloaded scripts on a plain double-click.)
+3. Follow the window. If Python is missing, macOS offers to install it; afterwards run step 2 again.
+
+**Windows**
+
+1. On GitHub, click **Code → Download ZIP**, right-click it → **Extract All**.
+2. In the extracted folder, double-click **Install on Windows.cmd**. If Windows shows "Windows protected your
+   PC", click **More info → Run anyway**.
+3. Follow the window. It installs Python with winget when it's missing.
+
+**Terminal, one line** (works only while the repository is public):
 
 ```bash
-npx skills add CodingBear123/claude-study-tool
+curl -fsSL https://raw.githubusercontent.com/CodingBear123/claude-study-tool/main/install.sh | sh
 ```
 
-Install both skills: `/study-vault` uses the tool and format that ship inside `study`.
-
-Claude Code plugin instead (commands then show up as `/claude-study-tool:study`):
-
-```bash
-claude plugin marketplace add CodingBear123/claude-study-tool
-claude plugin install claude-study-tool@claude-study-tool
+```powershell
+irm https://raw.githubusercontent.com/CodingBear123/claude-study-tool/main/install.ps1 | iex
 ```
 
-From a clone, for development (edits go live):
+The installer puts `/study` and `/study-vault` into `~/.claude/skills` (a link on Mac/Linux, a copy on
+Windows), adds a **Claude Study** app (Mac: `~/Applications`, Spotlight, optional Desktop shortcut; Windows:
+Desktop and Start menu; Linux: app menu) and a `claude-study` terminal command, and offers `pdftotext` for
+reading PDF slides. Run it again any time to update.
+
+Other ways, for agents besides Claude Code or for development:
 
 ```bash
-ln -s "$PWD/skills/study" ~/.claude/skills/study
+npx skills add CodingBear123/claude-study-tool          # any agent that reads Agent Skills
+claude plugin marketplace add CodingBear123/claude-study-tool && claude plugin install claude-study-tool@claude-study-tool
+ln -s "$PWD/skills/study" ~/.claude/skills/study        # from a clone: edits go live
 ln -s "$PWD/skills/study-vault" ~/.claude/skills/study-vault
 ```
 
-Needs Python 3.9+ (standard library only) and, for PDFs, `pdftotext` (poppler).
+Needs Python 3.9+ (standard library only).
+
+## Use it
+
+1. Open Claude Code in the folder with your course material and type `/study-vault`. It builds a
+   `StudyVault` folder with your notes.
+2. To study, type `/study`, or open the **Claude Study** app. The first time, the app asks for the folder
+   that holds your StudyVault and remembers it (pick another one with `claude-study --choose`).
 
 ## The page
 
-`/study` starts it for you. By hand:
+`/study` and the Claude Study app start it for you. By hand:
 
 ```bash
-python3 skills/study/app/server.py --root ~/path/to/notes
+python3 skills/study/app/launch.py                       # what the app runs: start if needed, open the browser
+python3 skills/study/app/server.py --root ~/path/to/notes  # just the server
 ```
 
 Open http://127.0.0.1:8765/. Tabs: **Quiz** (Claude's round, practice rounds from the bank, To do list),
@@ -50,15 +118,17 @@ notes, daily streak), **Question bank** (editor).
 
 After grading, each question links to the note section that covers it, and **Ask Claude** answers follow-up
 questions about it (also at the end of every note). Checks and questions are one-off `claude -p` calls
-with no tools; the **Claude** picker in the header chooses Sonnet, Opus or Haiku.
+with no tools; the **Claude** picker in the header chooses the model: the newest Sonnet, Opus, Haiku or
+Fable, a specific version such as Opus 4.8, or any other `claude-...` model ID.
 
 | Round | Graded by | Recorded by |
 |---|---|---|
 | Written by Claude | Claude, after you say "done" | `studyvault.py record` |
 | Practice round from the bank | the page; open answers by you (against the model answer) or by "Check with Claude" | the server |
 
-Themes: Tide (default), Dark Lab and Soft Garden, switched from the swatches in the header and remembered
-in the browser. Dark Lab and Soft Garden load their fonts from Google Fonts.
+Themes: Tide (default), Dark Lab and Soft Garden, switched from the swatches in the header. The theme and the
+model are saved in `~/.config/claude-study/prefs.json` (override with `STUDY_PREFS`), so they stay the
+same on every address and port the page is opened from. Dark Lab and Soft Garden load their fonts from Google Fonts.
 
 ## The vault
 

@@ -19,6 +19,7 @@ The data format is described in ../references/studyvault-spec.md.
 """
 import argparse
 import json
+import math
 import re
 import sys
 from datetime import date
@@ -36,7 +37,7 @@ SEP_RE = re.compile(r"^\|[-:| ]+\|\s*$")
 NOTE_RE = re.compile(r"^\*\*(.+?)\*\*\s*\n((?:- .*\n?)+)", re.M)
 WIKI_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 PRACTICE_GLOBS = ("*Practice*", "*practice*", "*Praxis*", "*bung*", "*Kprim*")
-TYPES = ("single", "open")
+TYPES = ("single", "multi", "kprim", "numeric", "open")
 
 # Structure words per vault language ("language" in studyvault.json). Parsing accepts all of them.
 LABELS = {
@@ -169,21 +170,42 @@ def validate_question(q, where="", need_answer=False):
     errs = []
     qid = q.get("id") or where or "?"
     if q.get("type") not in TYPES:
-        errs.append(f"{qid}: type must be 'single' or 'open'")
+        errs.append(f"{qid}: type must be one of {', '.join(TYPES)}")
     if not q.get("prompt") and not q.get("code"):
         errs.append(f"{qid}: needs a prompt or code")
-    if q.get("type") == "single":
+    is_int = lambda x: isinstance(x, int) and not isinstance(x, bool)
+    is_num = lambda x: isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+    t, ans = q.get("type"), q.get("answer")
+    if ans is None and need_answer and t in TYPES and t != "open":
+        errs.append(f"{qid}: bank questions need an answer")
+    if t in ("single", "multi"):
         opts = q.get("options")
         if not isinstance(opts, list) or not 2 <= len(opts) <= 8 or not all(isinstance(o, str) for o in opts):
-            errs.append(f"{qid}: single needs 2-8 string options")
+            errs.append(f"{qid}: {t} needs 2-8 string options")
             opts = []
-        ans = q.get("answer")
-        if ans is None and need_answer:
-            errs.append(f"{qid}: bank questions need an answer index")
-        if ans is not None and (not isinstance(ans, int) or isinstance(ans, bool) or not 0 <= ans < len(opts)):
-            errs.append(f"{qid}: answer must be an index into options")
         if len(set(opts)) != len(opts):
             errs.append(f"{qid}: duplicate options")
+        if t == "single" and ans is not None and not (is_int(ans) and 0 <= ans < len(opts)):
+            errs.append(f"{qid}: answer must be an index into options")
+        if t == "multi" and ans is not None and not (
+                isinstance(ans, list) and ans and len(set(ans)) == len(ans)
+                and all(is_int(a) and 0 <= a < len(opts) for a in ans)):
+            errs.append(f"{qid}: answer must be a list of the correct option indexes (at least one)")
+    if t == "kprim":
+        sts = q.get("statements")
+        if not isinstance(sts, list) or not 2 <= len(sts) <= 8 or not all(isinstance(x, str) and x.strip() for x in sts):
+            errs.append(f"{qid}: kprim needs 2-8 statements (usually 4)")
+            sts = []
+        if ans is not None and not (isinstance(ans, list) and len(ans) == len(sts) and all(isinstance(a, bool) for a in ans)):
+            errs.append(f"{qid}: answer must be a list of true/false, one per statement")
+    if t == "numeric":
+        if ans is not None and not is_num(ans):
+            errs.append(f"{qid}: answer must be a number")
+        tol = q.get("tolerance")
+        if tol is not None and not (is_num(tol) and tol >= 0):
+            errs.append(f"{qid}: tolerance must be a number >= 0")
+        if q.get("unit") is not None and not isinstance(q.get("unit"), str):
+            errs.append(f"{qid}: unit must be text")
     if q.get("difficulty") not in (None, "easy", "medium", "hard"):
         errs.append(f"{qid}: difficulty must be easy, medium or hard")
     return errs

@@ -205,6 +205,54 @@ class ServerTests(unittest.TestCase):
         self.assertIn("because", notes["late binding"])
         self.assertEqual(self.app.v.check()[0], [])
 
+    def test_question_types(self):
+        ok = [
+            {"id": "m", "type": "multi", "prompt": "p", "options": ["a", "b", "c"], "answer": [0, 2]},
+            {"id": "k", "type": "kprim", "prompt": "p", "statements": ["s1", "s2", "s3", "s4"],
+             "answer": [True, False, False, True]},
+            {"id": "n", "type": "numeric", "prompt": "p", "answer": 7.7, "tolerance": 0.05, "unit": "%"},
+        ]
+        for q in ok:
+            self.assertEqual(sv.validate_question(q, need_answer=True), [], q["id"])
+        bad = [
+            {"id": "m", "type": "multi", "prompt": "p", "options": ["a", "b"], "answer": []},
+            {"id": "m", "type": "multi", "prompt": "p", "options": ["a", "b"], "answer": [0, 5]},
+            {"id": "k", "type": "kprim", "prompt": "p", "statements": ["s1", "s2"], "answer": [True]},
+            {"id": "k", "type": "kprim", "prompt": "p", "statements": ["s1", "s2"], "answer": [1, 0]},
+            {"id": "n", "type": "numeric", "prompt": "p", "answer": "7.7"},
+            {"id": "n", "type": "numeric", "prompt": "p", "answer": 1, "tolerance": -1},
+            {"id": "n", "type": "numeric", "prompt": "p"},
+        ]
+        for q in bad:
+            self.assertNotEqual(sv.validate_question(q, need_answer=True), [], q)
+        # Claude-written rounds leave the key out
+        self.assertEqual(sv.validate_question({"type": "kprim", "prompt": "p", "statements": ["a", "b"]}), [])
+
+    def test_bank_round_shuffles_and_tracks_new_types(self):
+        self.app.v.put_bank("closures", {"questions": [
+            {"id": "m-1", "type": "multi", "concept": "free variables", "prompt": "p",
+             "options": ["a", "b", "c", "d"], "answer": [1, 3]},
+            {"id": "k-1", "type": "kprim", "concept": "cell objects", "prompt": "p",
+             "statements": ["w", "x", "y", "z"], "answer": [True, True, False, False]}]})
+        r = self.app.sample_round(["closures"], 4, None)
+        by = {q["id"]: q for q in r["questions"]}
+        m, k = by["m-1"], by["k-1"]
+        self.assertEqual(sorted(m["options"][i] for i in m["answer"]), ["b", "d"])
+        self.assertEqual({s for s, a in zip(k["statements"], k["answer"]) if a}, {"w", "x"})
+        self.app.save_results({"round_id": r["id"], "source": "bank", "answers": [
+            {"n": 1, "id": "m-1", "area": "closures", "concept": "free variables", "type": "multi",
+             "choices": m["answer"], "choice_text": "b; d", "correct": True},
+            {"n": 2, "id": "k-1", "area": "closures", "concept": "cell objects", "type": "kprim",
+             "tf": [True, True, True, False], "choice_text": "1 true, 2 true, 3 true, 4 false", "correct": False}]})
+        latest = sv.load_json(self.app.v.bank_dir / "results" / "latest.json")
+        self.assertTrue(latest["tracked"])
+        self.assertEqual(latest["tracked_count"], 2)
+        status = {r["name"]: r["status"] for r in self.app.v.concepts("closures")[0]}
+        self.assertEqual(status, {"free variables": "🟢", "cell objects": "🔴"})
+        text = "\n".join(server.question_text(dict(k, type="kprim")))
+        self.assertIn("STATEMENTS", text)
+        self.assertIn("CORRECT:", text)
+
     def test_open_answer_self_and_claude_grading(self):
         self.app.v.put_bank("closures", {"questions": [
             {"id": "c-2", "type": "open", "concept": "cell objects", "prompt": "What is a cell?",
@@ -277,6 +325,42 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(server.pick_model("gpt"), server.CLAUDE_MODEL)
         with self.assertRaises(ValueError):
             self.app.ask({"message": "  "})
+
+    def test_model_ids_and_saved_prefs(self):
+        for ok in ("opus", "fable", "claude-opus-4-8", "claude-sonnet-4-6[1m]", "claude-haiku-5-5"):
+            self.assertEqual(server.pick_model(ok), ok)
+        for bad in ("gpt-5", "--tools", "claude-", "claude-opus 4", "", None, 3):
+            self.assertEqual(server.pick_model(bad), server.CLAUDE_MODEL)
+        real = server.PREFS_FILE
+        with tempfile.TemporaryDirectory() as tmp:
+            server.PREFS_FILE = Path(tmp) / "sub" / "prefs.json"
+            try:
+                self.assertEqual(server.read_prefs(), {})
+                server.write_prefs({"theme": "dark"})
+                self.assertEqual(server.write_prefs({"model": "claude-opus-4-8", "theme": "neon", "x": 1}),
+                                 {"theme": "dark", "model": "claude-opus-4-8"})
+                html = server.index_html()
+                self.assertIn('window.STUDY_PREFS = {"theme": "dark", "model": "claude-opus-4-8"};', html)
+                self.assertLess(html.index("STUDY_PREFS"), html.index("applyTheme"))
+            finally:
+                server.PREFS_FILE = real
+
+    def test_launcher_remembers_folder(self):
+        import launch
+        real = server.PREFS_FILE
+        with tempfile.TemporaryDirectory() as tmp:
+            server.PREFS_FILE = Path(tmp) / "prefs.json"
+            try:
+                server.write_prefs({"theme": "dark"})
+                root = self.app.vault.parent
+                folder, vaults = launch.pick_vaults(str(root), False)
+                self.assertEqual(vaults, [str(self.app.vault.resolve())])
+                self.assertEqual(launch.pick_vaults(None, False), (folder, vaults))  # remembered, no dialog
+                server.write_prefs({"model": "opus"})  # the page's saves keep the folder
+                self.assertEqual(server.raw_prefs()["folder"], folder)
+                self.assertEqual(server.read_prefs(), {"theme": "dark", "model": "opus"})
+            finally:
+                server.PREFS_FILE = real
 
     def test_progress_shape(self):
         p = self.app.progress()

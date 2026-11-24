@@ -85,8 +85,9 @@ Follow `references/templates.md`:
   tagged `[recall]` / `[application]` / `[analysis]` (≥60% recall, ≥20% application, ≥2 analysis).
   Use old exam questions where they fit, with their source.
 - Seed `question-bank/<slug>.json` with 6–10 questions per area in the format of `../study/references/app.md`:
-  every question has `id` (`<prefix>-001`), `concept`, `type`, `difficulty`, `explanation`; single choice has
-  `answer`; open has `model_answer`; give `ref` (`"Note title#Heading"`) for the section that answers it.
+  every question has `id` (`<prefix>-001`), `concept`, `type`, `difficulty`, `explanation`; use the types the old
+  exams use (`single`, `multi`, `kprim`, `numeric`, `open`, see `quiz-rules.md`); every type but open has
+  `answer`, open has `model_answer`; give `ref` (`"Note title#Heading"`) for the section that answers it.
   Follow `../study/references/quiz-rules.md`. These power the page's
   practice rounds, so they must be correct: double-check every answer key, and run code you put in questions
   when you can.

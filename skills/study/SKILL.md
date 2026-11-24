@@ -63,8 +63,9 @@ tick them off. Stop when the user says pause; the tasks stay for next time.
    notes from `status`.
 2. Look at `question-bank/{area}.json`. Reuse at most 2 bank questions per round via `bank_ref`, preferring
    ones on 🔴 concepts.
-3. Write the rest yourself: 4 questions per round by default, `single` (4 options) and `open` mixed. For code
-   subjects prefer output prediction and debugging with real, indented code in the `code` field.
+3. Write the rest yourself: 4 questions per round by default, mixing the types in `references/quiz-rules.md`
+   (`single`, `multi`, `kprim`, `numeric`, `open`) in the proportions the old exams use. For code subjects prefer
+   output prediction and debugging with real, indented code in the `code` field.
 4. Every question gets `area` (a manifest slug) and `concept`. Reuse the exact concept name from the tracker
    when testing an existing concept, so its row updates instead of a duplicate appearing. Add
    `"ref": "Note title#Heading"` for the section you wrote the question from; after grading the page links
@@ -88,8 +89,9 @@ Format: `references/app.md`.
 
 1. Read `question-bank/results/latest.json` and check `round_id` matches your round. A pasted
    `STUDY round=<id> | 1=B | 2="text" | …` string works too.
-2. Grade single-choice against your key and open answers against the notes. Partly right counts as wrong for
-   tracking, but say what was right.
+2. Grade `single`, `multi`, `kprim` and `numeric` against your key (a multi or Kprim answer is right only if
+   every box is right; for Kprim also say how many of the 4 were right, since exams give half points for 3)
+   and open answers against the notes. Partly right counts as wrong for tracking, but say what was right.
 3. Show a table (question, correct answer, their answer, ✅/❌), then a short explanation for each miss, with
    code in fenced blocks and a `[[note]]` to reread.
 

@@ -27,7 +27,7 @@ StudyVault/
   "version": 1,
   "subject": "Software Construction",
   "language": "en",
-  "exam": {"date": "2027-01-20", "duration_min": 90, "format": "single choice + open answers"},
+  "exam": {"date": "2027-01-20", "duration_min": 90, "format": "single choice + Kprim + open answers"},
   "scope": "The HS26 session slides define the scope. Old exams are style references only.",
   "areas": [
     {"slug": "objects-and-classes", "title": "Objects and Classes", "folder": "01-Objects-and-Classes"},
@@ -104,8 +104,9 @@ Anything you write in it is overwritten by the next `recompute`; put notes in `0
 
 ## Question bank, rounds, results
 
-See `app.md`. A bank file is `{"area": "<slug>", "title": "...", "questions": [...]}`; every single-choice bank
-question needs `answer`, and every question should have a `concept`.
+See `app.md`. A bank file is `{"area": "<slug>", "title": "...", "questions": [...]}`; every bank question
+except `open` needs `answer` (its shape depends on the type, see `app.md`), and every question should have a
+`concept`.
 
 ## What `studyvault.py check` enforces
 
@@ -114,7 +115,7 @@ Errors (exit code 1):
 - a concept tracker or bank file without a manifest area, or an area without a tracker
 - malformed tracker rows, duplicate concepts, `correct > attempts`, bad dates, 🔴 without an error note,
   ⚪ rows that aren't `0 | 0 | -`
-- invalid bank JSON, wrong `area` key, duplicate ids, invalid questions, single-choice without `answer`
+- invalid bank JSON, wrong `area` key, duplicate ids, invalid questions, a question without `answer` (except open)
 - invalid results JSON or `tasks.json`
 - `Learning Dashboard.md` missing or different from what `recompute` would write
 

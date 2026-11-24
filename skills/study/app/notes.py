@@ -192,8 +192,10 @@ class Notes:
     def find_section(self, q, area_folder=None):
         """Best section for a question dict, or None."""
         weights = {}
-        for field, w in (("prompt", 1.0), ("code", 0.6), ("explanation", 1.5), ("model_answer", 1.5), ("concept", 3.0)):
-            for t in words(q.get(field)):
+        for field, w in (("prompt", 1.0), ("statements", 1.0), ("code", 0.6), ("explanation", 1.5), ("model_answer", 1.5),
+                         ("concept", 3.0)):
+            val = q.get(field)
+            for t in words(" ".join(map(str, val)) if isinstance(val, list) else val):
                 weights[t] = max(weights.get(t, 0), w)
         if not weights:
             return None

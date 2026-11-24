@@ -16,7 +16,7 @@ It finds vaults at startup, so restart it after creating one. Port taken → it'
 
 - **Quiz**: the round Claude wrote (`?round=current`), practice rounds from the bank, the To do list (`tasks.json`).
 - **Notes**: every note of the vault rendered from its Markdown (headings, tables, callouts with folds, code,
-  `[[wiki links]]`, `![[images]]`), with a filter and an "Open in Obsidian" link. Deep link:
+  `[[wiki links]]`, `![[images]]`, `$math$` and `$$math$$` via KaTeX), with a filter and an "Open in Obsidian" link. Deep link:
   `?view=notes&note=<path in the vault>&h=<heading anchor>`.
 - **Progress**: rate per area and the 🔴 concepts with their error notes, streak of answers per day.
 - **Question bank**: add and edit questions per area (validated by `studyvault.py` before saving).
@@ -25,7 +25,9 @@ API (all take `?vault=<id>`): `GET /api/vaults`, `GET /api/areas`, `GET /api/pro
 `GET|PUT /api/tasks`, `GET|PUT /api/bank/<area>`, `GET /api/round?id=current`,
 `GET /api/round?area=a,b&n=4&types=single`, `POST /api/results`, `POST /api/grade-open`, `GET /api/notes`
 (the note tree), `GET /api/note?path=`, `GET /api/asset?path=` (embedded images), `POST /api/note-ref`
-(`{"area", "question"}` → the section that covers it), `POST /api/ask`.
+(`{"area", "question"}` → the section that covers it), `POST /api/ask`. Without `?vault`: `GET|PUT /api/prefs`
+(`{"theme", "model"}`, saved in `~/.config/claude-study/prefs.json` or `STUDY_PREFS`, inlined into the page
+so the theme is right before first paint).
 
 ## Question
 
@@ -34,20 +36,26 @@ API (all take `?vault=<id>`): `GET /api/vaults`, `GET /api/areas`, `GET /api/pro
   "id": "per-003",                 // bank only; unique in the file; letters, digits, - _
   "area": "persistence",           // manifest slug; required in rounds, implied in the bank
   "concept": "naive save aliasing",// tracker row name; hidden from the user until graded
-  "type": "single",                // "single" or "open"
+  "type": "single",                // single | multi | kprim | numeric | open
   "lang": "python",                // highlight language
   "difficulty": "hard",            // easy | medium | hard
   "prompt": "What does `load(save(x))` return? Supports `inline`, **bold**, ```fences```.",
   "code": "a = [1]\nx = [a, a]",   // shown as a block, indentation kept exactly
-  "options": ["...", "..."],       // single only, 2-8
+  "options": ["...", "..."],       // single and multi, 2-8
   "options_code": true,            // render options as code
-  "answer": 2,                     // single only: option index. Bank: required. Your rounds: OMIT
+  "answer": 2,                     // the key, see below. Bank: required. Your rounds: OMIT
   "model_answer": "...",           // open only, bank
   "explanation": "...",            // shown after submit when the round reveals answers
   "source": "HS24 exam OA.3",
   "ref": "Persistence Format#Aliasing"  // optional: the note section that covers it (see below)
 }
 ```
+
+**Answer key per type.** `single`: option index (`2`). `multi`: list of the correct option indexes
+(`[0, 2]`, at least one). `kprim`: `statements` (2–8 strings, usually 4) instead of `options`, and `answer` is one
+true/false per statement (`[true, false, false, true]`). `numeric`: a number (`1024`, `7.71`), plus optional
+`tolerance` (± absolute, default exact) and `unit` (`"CHF"`, `"%"`); the page accepts `1'024`, `1 024`, `7,7`,
+`3/4`. `open`: no `answer`; the bank gives `model_answer`.
 
 **Note reference.** After grading, every question links to the note section that covers it ("Read: Note ›
 Heading", opens in a side panel). `ref` names it as `Note title#Heading` or `folder/Note.md#Heading`. Without
@@ -78,14 +86,22 @@ is wrong; `check` warns when a `ref` names no note. The bank editor shows the au
    {"n": 2, "area": "java", "concept": "...", "type": "open", "text": "their answer", "correct": null}]}
 ```
 
+Other types: `multi` gives `choices` (sorted indexes) and `choice_letters` (`"AC"`); `kprim` gives `tf` (one
+`true`/`false`/`null` per statement, in the order shown) and `right` (how many match, bank rounds only);
+`numeric` gives `text` (as typed) and `value` (parsed number or `null`). Every type but `open` has
+`choice_text`, a readable summary. Options and statements are shuffled only in bank rounds, so in your rounds
+indexes match your key.
+
 - `source: "claude"`: you grade everything, then `studyvault.py record` with the `round_id`, which sets
   `"tracked": true`.
-- `source: "bank"`: the user started it on the page. The server graded the single-choice answers, recorded
+- `source: "bank"`: the user started it on the page. The page graded every answer with a key (all types but
+  open), the server recorded
   them and set `"recorded": true` on each. Open answers with a bank `model_answer` can be graded on the page
   too (see below), which also sets `"recorded": true` plus `"graded_by": "self" | "claude"` and `"feedback"`.
   `"tracked": true` means nothing is left. Otherwise grade only the answered open questions without
   `"recorded"` and record those with the `round_id`.
-- Fallback paste string: `STUDY round=<id> | 1=B | 2="free text" | 3=A | 4=-` (`-` = no answer).
+- Fallback paste string: `STUDY round=<id> | 1=B | 2="free text" | 3=AC | 4=TFFT | 5="7,7"` (`-` = no answer;
+  multi lists the letters, Kprim gives T/F per statement, numbers come quoted as typed).
 
 ## Bank practice rounds
 
@@ -110,6 +126,9 @@ chat: the page has no model answers for them.
 After grading, every question has **Ask Claude**, and every note in the Notes tab and the side panel ends
 with an Ask box. Each message is one headless `claude -p` call like the check above (no tools, no files),
 with the question, the user's answer, the answer key when the page has it, the note section and the thread
-so far in the prompt. The **Claude** picker in the header (Sonnet, Opus, Haiku; remembered in the browser)
-sets the model for checks and questions; `STUDY_CLAUDE_MODEL` sets the default. Threads live in the page
+so far in the prompt. The **Claude** picker in the header sets the model for checks and questions:
+the aliases (`sonnet`, `opus`, `haiku`, `fable`: newest of each), pinned versions (`claude-opus-4-8`, ...;
+`STUDY_CLAUDE_MODELS=a,b,c` replaces the list), or any other `claude-...` ID typed in. The server passes only
+those to `--model`; anything else falls back to `STUDY_CLAUDE_MODEL` (default `sonnet`). The choice is saved
+with the theme (`/api/prefs`). Threads live in the page
 only and are gone after a reload.
