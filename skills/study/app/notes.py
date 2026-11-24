@@ -20,6 +20,10 @@ SKIP_DIRS = {"question-bank"}
 TRACKERS = "concepts"
 PRACTICE_RE = re.compile(r"(^|\s)(practice|übung|uebung)\b", re.I)
 WEAK_HEADS = {"exam patterns", "related notes", "related concepts", "prüfungsmuster", "verwandte notizen"}
+CALL_RE = re.compile(r"(?<![.\w])([A-Za-z_]\w*)\s*\(")  # save(...), not x.append(...)
+CODE_RE = re.compile(r"^```[^\n]*\n(.*?)^```", re.M | re.S)
+BUILTINS = set(dir(__import__("builtins"))) | {"def", "class", "if", "elif", "while", "for", "return", "and", "or", "not",
+                                               "in", "is", "with", "assert", "lambda", "yield", "except", "print"}
 STOP = set("""
 the and for are but not you your with this that what which when where who why how does did was were
 has have had its it's can could would should will shall may might must than then them they their there
@@ -162,6 +166,35 @@ class Notes:
             if keep:
                 body = "\n\n".join(keep)
         return note["title"], body[:limit]
+
+    def definitions(self, text, limit=3, size=2500):
+        """[(note title, code block)] from the notes that define the functions or classes `text` calls
+        without defining them itself, e.g. the course's save() for a question about save(writer, x)."""
+        names = []
+        for n in CALL_RE.findall(text or ""):
+            if n not in names and n not in BUILTINS and not re.search(rf"^\s*(def|class)\s+{re.escape(n)}\b", text, re.M):
+                names.append(n)
+        if not names:
+            return []
+        blocks = []
+        for f in sorted(self.files(trackers=False), key=lambda f: (bool(PRACTICE_RE.search(f.stem)), str(f))):
+            try:
+                body = split_front(f.read_text(encoding="utf-8"))[1]
+            except OSError:
+                continue
+            blocks += [(f.stem, b) for b in CODE_RE.findall(body)]
+        out, found = [], set()
+        # top-level definitions first: save(writer, x) means the function save, not some class's save method
+        for indent in (r"", r"[ \t]+"):
+            for title, block in blocks:
+                hits = [n for n in names if n not in found
+                        and re.search(rf"^{indent}(def|class)\s+{re.escape(n)}\b", block, re.M)]
+                if hits:
+                    found.update(hits)
+                    out.append((title, block.rstrip()[:size]))
+                    if len(out) >= limit or len(found) == len(names):
+                        return out
+        return out
 
     # ----- question -> section -----
 

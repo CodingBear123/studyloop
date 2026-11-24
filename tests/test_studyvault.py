@@ -121,6 +121,17 @@ class VaultTests(unittest.TestCase):
         self.assertEqual(v.stats()["rate"], 50)
 
 
+    def test_updating_the_last_row_keeps_the_table_apart(self):
+        t = sv.concept_template("Area")
+        for correct in (False, True, False):  # the last row is updated in place three times
+            t = sv.apply_answer(t, "c1", correct, "mixed up", "the point", "2026-11-24")
+        t = sv.apply_answer(t, "c2", False, "x", "y", "2026-11-24")  # a new concept lands in the table
+        rows, notes = sv.parse_concepts_text(t)
+        self.assertEqual([(r["name"], r["attempts"], r["correct"]) for r in rows], [("c1", 3, 1), ("c2", 1, 0)])
+        self.assertNotIn("|###", t)
+        self.assertIn("|\n\n### Error Notes", t)
+
+
 class OldFormatTests(unittest.TestCase):
     """Trackers written by older /tutor versions, as found in real vaults."""
 
@@ -325,6 +336,23 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(server.pick_model("gpt"), server.CLAUDE_MODEL)
         with self.assertRaises(ValueError):
             self.app.ask({"message": "  "})
+
+    def test_ask_includes_code_the_question_calls(self):
+        d = self.app.v.path / "01-Closures"
+        (d / "Saver.md").write_text("# Saver\n```python\nclass Saver:\n    def save(self, x):\n        pass\n```\n"
+                                    "```python\ndef save(writer, thing):\n    for item in thing:\n        save(writer, item)\n```\n")
+        defs = self.app.notes.definitions("`x = [1]; x.append(x)`, then `save(writer, x)`. print(len(x))?")
+        self.assertEqual(len(defs), 1)
+        self.assertIn("def save(writer, thing)", defs[0][1])  # the function, not the method; no print/len/append
+        self.assertEqual(self.app.notes.definitions("def save(w, t): ...\nsave(w, 1)"), [])  # defined in the question
+        seen = {}
+        real = server.run_claude
+        server.run_claude = lambda prompt, model=None, schema=None, timeout=0: seen.update(p=prompt) or "ok"
+        try:
+            self.app.ask({"message": "what does save(writer, x) do?"})
+        finally:
+            server.run_claude = real
+        self.assertIn("CODE FROM THE COURSE NOTES (Saver)", seen["p"])
 
     def test_model_ids_and_saved_prefs(self):
         for ok in ("opus", "fable", "claude-opus-4-8", "claude-sonnet-4-6[1m]", "claude-haiku-5-5"):

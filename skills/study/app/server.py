@@ -179,18 +179,25 @@ def question_text(q):
     return parts
 
 
-def ask_claude(q, text, subject, lang, model=None):
+def ask_claude(q, text, subject, lang, model=None, note=None, code=None):
     """Grade one open answer with headless Claude Code. Returns the GRADE_SCHEMA dict."""
     parts = [
-        f"You grade one open exam answer for the course \"{subject}\".",
-        "Be an exam corrector: correct is true only if the core idea is right and nothing important is",
-        "wrong or missing compared with the model answer. Partly right counts as false.",
-        "Write feedback (1-3 sentences, to the student, say what was right and what was missing), confusion",
-        "(what they mixed up, one line, empty if correct) and key_point (the correct idea, one line) in",
-        lang_word(lang) + ".", ""] + question_text(q)
+        f"You grade one open exam answer for the course \"{subject}\", like a fair human corrector.",
+        "correct is true when the student has the core idea of the model answer, in their own words: a short",
+        "or informal answer is fine, and a minor detail left out doesn't make it wrong. correct is false when",
+        "the core idea is missing or misunderstood, or when the answer says something that is actually wrong.",
+        "The model answer is a short key, not the only right answer: a detail it doesn't mention is NOT a",
+        "mistake if it is true for this course. Check such details against the COURSE NOTES below; only call",
+        "them wrong if the notes contradict them. If you can't tell, don't hold it against the student.",
+        "Write feedback (1-3 sentences, to the student: what was right, then what would make it complete),",
+        "confusion (what they actually got wrong, one line, empty if correct) and key_point (the correct idea,",
+        "one line) in " + lang_word(lang) + ".", ""] + question_text(q)
     parts += ["", "MODEL ANSWER:", q.get("model_answer") or "(none)"]
     if q.get("explanation"):
         parts += ["", "EXPLANATION:", q["explanation"]]
+    if note:
+        parts += ["", "COURSE NOTES (the section that covers this question):", note]
+    parts += code_context(code)
     parts += ["", "STUDENT ANSWER:", text.strip() or "(empty)"]
     verdict = run_claude("\n".join(parts), model, GRADE_SCHEMA)
     try:
@@ -200,14 +207,24 @@ def ask_claude(q, text, subject, lang, model=None):
     return verdict
 
 
-def ask_tutor(subject, lang, message, history=(), question=None, student=None, note=None, model=None):
+def code_context(code):
+    """Prompt lines for code from the notes that the question uses."""
+    out = []
+    for title, block in code or ():
+        out += ["", f"CODE FROM THE COURSE NOTES ({title}):", "```", block, "```"]
+    return out
+
+
+def ask_tutor(subject, lang, message, history=(), question=None, student=None, note=None, model=None, code=None):
     """Answer a free question from the student, with the question and the course notes as context."""
     parts = [
         f"You are a tutor for the university course \"{subject}\". The student is studying for the exam and",
         "asks you something. Answer the question they asked, clearly and briefly (usually under 200 words),",
         f"in {lang_word(lang)} unless they write in another language. Use Markdown; put code in fenced blocks",
-        "with indentation kept. Base the answer on the course notes below; if they don't cover it, say so and",
-        "answer from general knowledge. You have no tools and can't see any files besides what is below."]
+        "with indentation kept. Base the answer on the course notes and code below; only if none of it covers",
+        "the question, say so (\"the excerpts below don't show ...\") and answer from general knowledge.",
+        "You have no tools and only see the excerpts below, not all the notes, so never claim something is",
+        "missing from the course."]
     if question:
         parts += ["", "THE PRACTICE QUESTION THEY ARE LOOKING AT"] + question_text(question)
         for k, label in (("model_answer", "MODEL ANSWER"), ("explanation", "EXPLANATION")):
@@ -217,6 +234,7 @@ def ask_tutor(subject, lang, message, history=(), question=None, student=None, n
             parts += ["", "WHAT THE STUDENT ANSWERED:", student]
     if note:
         parts += ["", f"COURSE NOTES ({note[0]}):", note[1]]
+    parts += code_context(code)
     if history:
         parts += ["", "CONVERSATION SO FAR:"]
         for h in list(history)[-10:]:
@@ -395,7 +413,15 @@ class App:
         text = a.get("text") or ""
         mode = data.get("mode")
         if mode == "claude":
-            verdict = ask_claude(q, text, self.v.manifest.get("subject", ""), self.v.lang, data.get("model"))
+            note = None
+            try:  # the note section that covers it, so details the short model answer leaves out can be checked
+                ref = self.notes.note_for(q, self.folder(area))
+                if ref and ref.get("path"):
+                    note = self.notes.section_text(ref["path"], ref.get("anchor") or "", limit=5000)[1]
+            except Exception:
+                pass
+            code = self.notes.definitions("\n".join(question_text(q)))
+            verdict = ask_claude(q, text, self.v.manifest.get("subject", ""), self.v.lang, data.get("model"), note, code)
         elif mode == "self":
             verdict = {"correct": bool(data.get("correct")), "feedback": "", "confusion": "", "key_point": ""}
         else:
@@ -450,8 +476,9 @@ class App:
             note = self.notes.section_text(ref["path"], ref.get("anchor") or "")
         history = [h for h in (data.get("history") or []) if isinstance(h, dict)]
         student = str(data.get("student") or "")[:4000] or None
+        code = self.notes.definitions("\n".join(question_text(q)) if q else message)
         answer = ask_tutor(self.v.manifest.get("subject", ""), self.v.lang, message[:4000], history, q, student,
-                           note, data.get("model"))
+                           note, data.get("model"), code)
         return {"answer": answer, "model": pick_model(data.get("model"))}
 
     def progress(self):
