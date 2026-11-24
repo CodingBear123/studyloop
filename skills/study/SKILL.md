@@ -1,7 +1,7 @@
 ---
 name: study
 description: >
-  Quiz and track study progress in an Obsidian StudyVault (claude-study-tool). Use when the user
+  Quiz and track study progress in an Obsidian StudyVault (studyloop). Use when the user
   wants to be quizzed or tested, study or review a topic, drill weak areas, run an exam simulation,
   follow a timed study plan ("I have 2 hours"), grade a round they took in the browser app, or check
   their progress. Triggers: "/study", "quiz me", "test me", "let's study", "drill", "how am I doing".

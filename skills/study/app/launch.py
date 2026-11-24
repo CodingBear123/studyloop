@@ -2,11 +2,12 @@
 """Open the study page with one click: start the server if it isn't running, then open the browser.
 
 The first time (or with --choose) it asks for the folder that holds your StudyVault(s) and remembers
-it in the prefs file (~/.config/claude-study/prefs.json). Standard library only.
+it in the prefs file (~/.config/studyloop/prefs.json). Standard library only.
 
     python3 launch.py              # open the page
     python3 launch.py ~/Notes      # use this folder from now on
     python3 launch.py --choose     # pick another folder
+    python3 launch.py --restart    # restart running pages so they load changed code, then open
 """
 import json
 import os
@@ -23,7 +24,7 @@ import server  # noqa: E402
 import studyvault as sv  # noqa: E402
 
 PORTS = range(8765, 8776)
-TITLE = "Claude Study"
+TITLE = "Studyloop"
 # A double-clicked app gets a short PATH; add the places Claude Code and Homebrew install to,
 # so the server finds `claude` for checks and questions.
 EXTRA_PATH = [Path.home() / ".local" / "bin", Path.home() / ".claude" / "local", Path("/opt/homebrew/bin"),
@@ -156,7 +157,33 @@ def start(folder, vaults):
     sys.exit(1)
 
 
+def restart_all():
+    """Ask every running study page to restart itself (it keeps its folder and port)."""
+    done = []
+    for port in PORTS:
+        if running(port) is None:
+            continue
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/restart", data=b"{}", method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=3).read()
+        except Exception:
+            continue  # an old version without /api/restart: leave it running
+        done.append(port)
+    for port in done:
+        time.sleep(0.6)
+        for _ in range(40):
+            if running(port) is not None:
+                break
+            time.sleep(0.25)
+        print(f"restarted the page on port {port}")
+    return done
+
+
 def main():
+    if "--restart" in sys.argv:
+        restart_all()
+
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     folder, vaults = pick_vaults(args[0] if args else None, "--choose" in sys.argv)
     port = start(folder, vaults)

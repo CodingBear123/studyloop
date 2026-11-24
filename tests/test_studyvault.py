@@ -370,3 +370,138 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HTTPSecurityTests(unittest.TestCase):
+    """The real HTTP server: only the study page itself may use it, not other websites."""
+
+    def setUp(self):
+        import threading
+        from http.server import ThreadingHTTPServer
+        self.tmp = tempfile.TemporaryDirectory()
+        v = make_vault(self.tmp.name)
+        self.srv = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler({"Course": server.App(v.path)}))
+        self.port = self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+        self.tmp.cleanup()
+
+    def req(self, method, path, body=None, headers=None):
+        import http.client
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c.putrequest(method, path, skip_host=True, skip_accept_encoding=True)
+        h = {"Host": f"127.0.0.1:{self.port}", "Content-Type": "application/json", **(headers or {})}
+        data = body.encode() if isinstance(body, str) else body
+        if data is not None and "Content-Length" not in h:
+            h["Content-Length"] = str(len(data))
+        for k, val in h.items():
+            if val is not None:
+                c.putheader(k, val)
+        c.endheaders(data)
+        r = c.getresponse()
+        out = r.status, r.read()
+        c.close()
+        return out
+
+    def test_page_works(self):
+        self.assertEqual(self.req("GET", "/")[0], 200)
+        self.assertEqual(self.req("GET", "/api/vaults", headers={"Host": f"localhost:{self.port}"})[0], 200)
+        ok = {"Origin": f"http://127.0.0.1:{self.port}"}
+        self.assertEqual(self.req("POST", "/api/note-ref", '{"area": "closures", "question": {}}', ok)[0], 200)
+        self.assertEqual(self.req("PUT", "/api/tasks?vault=Course", '{"tasks": []}', ok)[0], 200)
+
+    def test_other_websites_are_refused(self):
+        # DNS rebinding: a foreign Host can't read anything
+        self.assertEqual(self.req("GET", "/api/vaults", headers={"Host": "evil.example:%d" % self.port})[0], 403)
+        self.assertEqual(self.req("GET", "/", headers={"Host": "evil.example"})[0], 403)
+        # cross-site "simple" POSTs (no preflight) are refused before they touch the vault
+        res = '{"round_id": "evil-1", "source": "bank", "answers": []}'
+        self.assertEqual(self.req("POST", "/api/results", res, {"Content-Type": "text/plain"})[0], 403)
+        self.assertEqual(self.req("POST", "/api/results", res, {"Content-Type": None})[0], 403)
+        self.assertEqual(self.req("POST", "/api/results", res, {"Origin": "https://evil.example"})[0], 403)
+        self.assertEqual(self.req("POST", "/api/ask", '{"message": "hi"}', {"Origin": "null"})[0], 403)
+        self.assertFalse((Path(self.tmp.name) / "Course/StudyVault/question-bank/results/evil-1.json").exists())
+
+    def test_bad_bodies(self):
+        self.assertEqual(self.req("POST", "/api/note-ref", "{}", {"Content-Length": "-1"})[0], 400)
+        self.assertEqual(self.req("POST", "/api/note-ref", "{}", {"Content-Length": "99999999999"})[0], 400)
+        self.assertEqual(self.req("POST", "/api/note-ref", "[1, 2]")[0], 400)
+        self.assertEqual(self.req("POST", "/api/note-ref", "not json")[0], 400)
+        self.assertEqual(self.req("PUT", "/api/tasks", '{"tasks": [1]}')[0], 500)  # answered, not dropped
+    def test_update_and_restart_need_the_page(self):
+        evil = {"Origin": "https://evil.example"}
+        self.assertEqual(self.req("POST", "/api/update", "{}", evil)[0], 403)
+        self.assertEqual(self.req("POST", "/api/restart", "{}", {"Content-Type": "text/plain"})[0], 403)
+        self.assertEqual(self.req("GET", "/api/update", headers={"Host": "evil.example"})[0], 403)
+
+
+class UpdaterTests(unittest.TestCase):
+    """The Update button: a git checkout that follows GitHub (here a local bare repository)."""
+
+    def setUp(self):
+        import subprocess
+        import updater
+        self.up, self.old_repo = updater, updater.REPO
+        self.tmp = tempfile.TemporaryDirectory()
+        t = Path(self.tmp.name)
+        self.g = lambda cwd, *a: subprocess.run(["git", "-C", str(cwd), "-c", "user.name=t", "-c", "user.email=t@t",
+                                                 *a], check=True, capture_output=True, text=True).stdout
+        subprocess.run(["git", "init", "--bare", "-q", "-b", "main", str(t / "origin.git")], check=True)
+        for name in ("mine", "other"):
+            subprocess.run(["git", "clone", "-q", str(t / "origin.git"), str(t / name)], check=True, capture_output=True)
+        self.mine, self.other = t / "mine", t / "other"
+        self.commit(self.other, "skills/study/SKILL.md", "v1", "first")
+        self.g(self.other, "push", "-q", "origin", "HEAD:main")
+        self.g(self.mine, "pull", "-q", "origin", "main")
+        self.g(self.mine, "branch", "-q", "--set-upstream-to=origin/main")
+        updater.REPO = self.mine
+
+    def tearDown(self):
+        self.up.REPO = self.old_repo
+        self.tmp.cleanup()
+
+    def commit(self, repo, rel, text, msg):
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text)
+        self.g(repo, "add", "-A")
+        self.g(repo, "commit", "-q", "-m", msg)
+
+    def test_finds_and_pulls_an_update(self):
+        self.assertFalse(self.up.status(force=True)["available"])
+        self.commit(self.other, "skills/study/SKILL.md", "v2", "Better hints")
+        self.g(self.other, "push", "-q", "origin", "HEAD:main")
+        st = self.up.status(force=True)
+        self.assertEqual((st["behind"], st["can_update"], st["changes"]), (1, True, ["Better hints"]))
+        self.up.apply()
+        self.assertEqual((self.mine / "skills/study/SKILL.md").read_text(), "v2")
+        self.assertFalse(self.up.status(force=True)["available"])
+
+    def test_local_edits_are_not_overwritten(self):
+        self.commit(self.other, "skills/study/SKILL.md", "v2", "theirs")
+        self.g(self.other, "push", "-q", "origin", "HEAD:main")
+        (self.mine / "skills/study/SKILL.md").write_text("my edit")
+        self.assertTrue(self.up.status(force=True)["local_changes"])
+        with self.assertRaisesRegex(ValueError, "your own changes|Your own changes"):
+            self.up.apply()
+        self.assertEqual((self.mine / "skills/study/SKILL.md").read_text(), "my edit")
+
+    def test_not_a_git_checkout(self):
+        self.up.REPO = Path(self.tmp.name) / "plain"
+        st = self.up.status(force=True)
+        self.assertFalse(st["can_update"])
+        self.assertIn("installer", st["reason"])
+
+    def test_windows_skill_copies_are_refreshed(self):
+        home = Path(self.tmp.name) / "home"
+        ours, theirs = home / ".claude/skills/study", home / ".claude/skills/study-vault"
+        ours.mkdir(parents=True)
+        (ours / ".claude-study-tool").write_text("old marker")
+        theirs.mkdir(parents=True)
+        (theirs / "SKILL.md").write_text("someone else's")
+        self.assertEqual(self.up.refresh_copies(home), ["study"])
+        self.assertEqual((ours / "SKILL.md").read_text(), "v1")
+        self.assertTrue((ours / ".studyloop").exists())
+        self.assertEqual((theirs / "SKILL.md").read_text(), "someone else's")

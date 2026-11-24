@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""StudyVault data layer for claude-study-tool.
+"""StudyVault data layer for Studyloop.
 
 Every read and write of tracking data goes through this file, so the vault
 stays consistent whether Claude, the browser app or you change it.
@@ -44,7 +44,7 @@ LABELS = {
     "en": {"tracker": "Concept Tracker", "head": ("Concept", "Attempts", "Correct", "Last Tested", "Status"),
            "notes": "### Error Notes", "confusion": "Confusion", "key": "Key point",
            "placeholder": "(added as concepts are missed)",
-           "dash_intro": "concept tracking, built from `concepts/*.md` by claude-study-tool. "
+           "dash_intro": "concept tracking, built from `concepts/*.md` by Studyloop. "
                          "Don't edit the numbers here: run `studyvault.py recompute`.",
            "by_area": "Proficiency by Area", "cols": ("Area", "Correct", "Wrong", "Rate", "Level", "Details"),
            "excluded": "not on the exam", "stats": "Stats",
@@ -54,7 +54,7 @@ LABELS = {
     "de": {"tracker": "Konzept-Tracker", "head": ("Konzept", "Versuche", "Richtig", "Zuletzt getestet", "Status"),
            "notes": "### Fehlernotizen", "confusion": "Verwechslung", "key": "Kernpunkt",
            "placeholder": "(wird bei Fehlern ergänzt)",
-           "dash_intro": "Konzept-Tracking, erzeugt aus `concepts/*.md` von claude-study-tool. "
+           "dash_intro": "Konzept-Tracking, erzeugt aus `concepts/*.md` von Studyloop. "
                          "Zahlen nicht von Hand ändern: `studyvault.py recompute` ausführen.",
            "by_area": "Stand pro Bereich", "cols": ("Bereich", "Richtig", "Falsch", "Quote", "Stufe", "Details"),
            "excluded": "nicht prüfungsrelevant", "stats": "Statistik",
@@ -861,7 +861,7 @@ def migrate_vault(path, write=False, today=None):
         if added:
             plan["notes_added"][f"{slug}.md"] = added
     old_dash = v.old_dashboards()
-    if v.dashboard.exists() and "claude-study-tool" not in v.dashboard.read_text(encoding="utf-8"):
+    if v.dashboard.exists() and not any(m in v.dashboard.read_text(encoding="utf-8").lower() for m in ("studyloop", "claude-study-tool")):
         old_dash.append(v.dashboard)
     plan["moved"] = [str(p.relative_to(v.path)) for p in old_dash]
     if not write:
@@ -908,7 +908,7 @@ def migrate_vault(path, write=False, today=None):
 # ---------- CLI ----------
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="studyvault.py", description="StudyVault data tool (claude-study-tool)")
+    ap = argparse.ArgumentParser(prog="studyvault.py", description="StudyVault data tool (Studyloop)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("status", "check", "recompute"):
         sub.add_parser(name).add_argument("vault")

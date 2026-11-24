@@ -1,9 +1,9 @@
 {
-  "name": "claude-study-tool",
+  "name": "studyloop",
   "owner": {"name": "CodingBear123"},
   "plugins": [
     {
-      "name": "claude-study-tool",
+      "name": "studyloop",
       "source": "./",
       "description": "/study and /study-vault: StudyVault notes, browser quizzes and concept tracking."
     }

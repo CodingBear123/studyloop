@@ -1,4 +1,4 @@
-# Claude Study Tool
+# Studyloop
 
 Two agent skills and a local quiz page for studying from a **StudyVault**, a folder of Markdown notes that
 also opens as an Obsidian vault.
@@ -38,7 +38,7 @@ bank never drift apart. `studyvault.py check` proves it.
 2. **Study.** Type `/study`. Claude picks a session from your progress (diagnostic, drill your weak spots,
    one area, exam simulation, or a timed plan) and writes a round. You answer it on the **study page**: a small
    website that runs only on your computer (`http://127.0.0.1:8765`) and reads and saves the vault directly.
-   Code keeps its indentation there and formulas render. Open it any time with the Claude Study app, also
+   Code keeps its indentation there and formulas render. Open it any time with the Studyloop app, also
    without Claude: practice rounds from the question bank, your notes, your progress.
 3. **Track.** Claude grades the round, explains every miss with a link to the note section to reread, and
    records each answer in the concept tracker: 🔴 concepts you got wrong, 🟢 once you get them right. The next
@@ -73,23 +73,25 @@ itself. If you like Obsidian, open the folder that contains `StudyVault/` as a v
 **Terminal, one line** (works only while the repository is public):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CodingBear123/claude-study-tool/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/CodingBear123/studyloop/main/install.sh | sh
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/CodingBear123/claude-study-tool/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/CodingBear123/studyloop/main/install.ps1 | iex
 ```
 
 The installer puts `/study` and `/study-vault` into `~/.claude/skills` (a link on Mac/Linux, a copy on
-Windows), adds a **Claude Study** app (Mac: `~/Applications`, Spotlight, optional Desktop shortcut; Windows:
-Desktop and Start menu; Linux: app menu) and a `claude-study` terminal command, and offers `pdftotext` for
-reading PDF slides. Run it again any time to update.
+Windows), adds a **Studyloop** app (Mac: `~/Applications`, Spotlight, optional Desktop shortcut; Windows:
+Desktop and Start menu; Linux: app menu) and a `studyloop` terminal command, and offers `pdftotext` for
+reading PDF slides. It installs with git when git is there, so the page can update itself (see
+[Updating](#updating)); otherwise run it again to update. A copy installed under the old name (Claude Study)
+is moved over and the old app and command are removed.
 
 Other ways, for agents besides Claude Code or for development:
 
 ```bash
-npx skills add CodingBear123/claude-study-tool          # any agent that reads Agent Skills
-claude plugin marketplace add CodingBear123/claude-study-tool && claude plugin install claude-study-tool@claude-study-tool
+npx skills add CodingBear123/studyloop                  # any agent that reads Agent Skills
+claude plugin marketplace add CodingBear123/studyloop && claude plugin install studyloop@studyloop
 ln -s "$PWD/skills/study" ~/.claude/skills/study        # from a clone: edits go live
 ln -s "$PWD/skills/study-vault" ~/.claude/skills/study-vault
 ```
@@ -100,12 +102,12 @@ Needs Python 3.9+ (standard library only).
 
 1. Open Claude Code in the folder with your course material and type `/study-vault`. It builds a
    `StudyVault` folder with your notes.
-2. To study, type `/study`, or open the **Claude Study** app. The first time, the app asks for the folder
-   that holds your StudyVault and remembers it (pick another one with `claude-study --choose`).
+2. To study, type `/study`, or open the **Studyloop** app. The first time, the app asks for the folder
+   that holds your StudyVault and remembers it (pick another one with `studyloop --choose`).
 
 ## The page
 
-`/study` and the Claude Study app start it for you. By hand:
+`/study` and the Studyloop app start it for you. By hand:
 
 ```bash
 python3 skills/study/app/launch.py                       # what the app runs: start if needed, open the browser
@@ -127,8 +129,31 @@ Fable, a specific version such as Opus 4.8, or any other `claude-...` model ID.
 | Practice round from the bank | the page; open answers by you (against the model answer) or by "Check with Claude" | the server |
 
 Themes: Tide (default), Dark Lab and Soft Garden, switched from the swatches in the header. The theme and the
-model are saved in `~/.config/claude-study/prefs.json` (override with `STUDY_PREFS`), so they stay the
+model are saved in `~/.config/studyloop/prefs.json` (override with `STUDY_PREFS`), so they stay the
 same on every address and port the page is opened from. Dark Lab and Soft Garden load their fonts from Google Fonts.
+
+## Updating
+
+When GitHub has a newer version, an **Update Studyloop** button shows up in the page header (hover it to see
+what changed). It runs `git pull --ff-only` in the install folder, copies the skills again on Windows, and
+restarts the page, which reloads itself. Your vaults aren't touched. The page checks at most once an hour.
+
+It needs a git checkout (what the installers make when git is installed). If you changed Studyloop's own
+files, the button says so instead of overwriting them: commit or stash first. Without git, run the
+installer again.
+
+## Working on Studyloop
+
+No reinstall needed. On Mac and Linux `~/.claude/skills/study` and `study-vault` are links into the folder
+you installed from, so edits to `SKILL.md`, the references and `studyvault.py` count from the next `/study`.
+The page is a running server, so after changing `server.py`, `notes.py`, `studyvault.py` or `updater.py`:
+
+```bash
+studyloop --restart      # or: python3 skills/study/app/launch.py --restart
+```
+
+That restarts every open study page on its own port, then opens it. A plain reload is enough for
+`index.html`. On Windows the skills are copies: run `install.ps1` from your clone again after editing them.
 
 ## The vault
 

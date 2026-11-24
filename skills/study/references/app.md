@@ -26,8 +26,13 @@ API (all take `?vault=<id>`): `GET /api/vaults`, `GET /api/areas`, `GET /api/pro
 `GET /api/round?area=a,b&n=4&types=single`, `POST /api/results`, `POST /api/grade-open`, `GET /api/notes`
 (the note tree), `GET /api/note?path=`, `GET /api/asset?path=` (embedded images), `POST /api/note-ref`
 (`{"area", "question"}` → the section that covers it), `POST /api/ask`. Without `?vault`: `GET|PUT /api/prefs`
-(`{"theme", "model"}`, saved in `~/.config/claude-study/prefs.json` or `STUDY_PREFS`, inlined into the page
-so the theme is right before first paint).
+(`{"theme", "model"}`, saved in `~/.config/studyloop/prefs.json` or `STUDY_PREFS`, inlined into the page
+so the theme is right before first paint), `GET /api/update` (`?check` skips the hourly cache: is GitHub
+ahead of this git checkout), `POST /api/update` (`git pull --ff-only`, re-copy Windows skill copies, restart),
+`POST /api/restart` (`launch.py --restart` after editing the app's Python files).
+
+Only the page itself may use the API: requests need `Host: 127.0.0.1:<port>` (or `localhost`), and POST/PUT
+need `Content-Type: application/json` and no foreign `Origin`. Other websites in the browser get 403.
 
 ## Question
 

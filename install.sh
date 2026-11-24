@@ -1,16 +1,16 @@
 #!/bin/sh
-# Claude Study Tool installer for macOS and Linux. Safe to run again: it updates what is there.
+# Studyloop installer for macOS and Linux. Safe to run again: it updates what is there.
 #
 #   From a downloaded copy:  sh install.sh
-#   Straight from GitHub:    curl -fsSL https://raw.githubusercontent.com/CodingBear123/claude-study-tool/main/install.sh | sh
+#   Straight from GitHub:    curl -fsSL https://raw.githubusercontent.com/CodingBear123/studyloop/main/install.sh | sh
 #
-# What it does: checks Python, gets the tool (into ~/.claude-study-tool unless run from a copy),
-# links the /study and /study-vault skills into ~/.claude/skills, adds the "Claude Study" app and the
-# `claude-study` command, and checks for Claude Code and pdftotext.
+# What it does: checks Python, gets the tool (into ~/.studyloop unless run from a copy),
+# links the /study and /study-vault skills into ~/.claude/skills, adds the "Studyloop" app and the
+# `studyloop` command, and checks for Claude Code and pdftotext.
 set -e
 
-REPO="CodingBear123/claude-study-tool"
-DEST="${CLAUDE_STUDY_HOME:-$HOME/.claude-study-tool}"
+REPO="CodingBear123/studyloop"
+DEST="${STUDYLOOP_HOME:-$HOME/.studyloop}"
 SKILLS="$HOME/.claude/skills"
 BIN="$HOME/.local/bin"
 
@@ -22,7 +22,7 @@ ask() {  # ask "Question?" -> 0 for yes (works when the script is piped into sh)
   case "$a" in [nN]*) return 1 ;; *) return 0 ;; esac
 }
 
-bold "Claude Study Tool"
+bold "Studyloop"
 
 # 1. Python 3.9+ (on a Mac without it, python3 is a stub that offers to install the developer tools)
 bold "1/5 Python"
@@ -40,9 +40,13 @@ else
   exit 1
 fi
 
-# 2. The tool itself: use this copy if the script runs from one, else download or update ~/.claude-study-tool
-bold "2/5 Claude Study Tool"
+# 2. The tool itself: use this copy if the script runs from one, else download or update ~/.studyloop
+bold "2/5 Studyloop"
 HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "")"
+OLD="$HOME/.claude-study-tool"  # where it lived before the rename to Studyloop
+if [ -z "$STUDYLOOP_HOME" ] && [ -d "$OLD" ] && [ ! -e "$DEST" ]; then
+  mv "$OLD" "$DEST" && ok "moved $OLD to $DEST"
+fi
 if [ -n "$HERE" ] && [ -f "$HERE/skills/study/app/server.py" ]; then
   SRC="$HERE"
   ok "using this copy: $SRC"
@@ -78,37 +82,41 @@ for s in study study-vault; do
   ok "/$s"
 done
 
-# 4. One-click start: an app (Mac) or menu entry (Linux), plus the claude-study command
-bold "4/5 The Claude Study app"
+# 4. One-click start: an app (Mac) or menu entry (Linux), plus the studyloop command
+bold "4/5 The Studyloop app"
 mkdir -p "$BIN"
-cat > "$BIN/claude-study" <<EOF
+# the names from before the rename (Claude Study)
+rm -f "$BIN/claude-study" "$HOME/.local/share/applications/claude-study.desktop"
+rm -rf "$HOME/Applications/Claude Study.app"
+[ -L "$HOME/Desktop/Claude Study" ] && rm -f "$HOME/Desktop/Claude Study"
+cat > "$BIN/studyloop" <<EOF
 #!/bin/sh
 exec "$PY" "$APP/launch.py" "\$@"
 EOF
-chmod +x "$BIN/claude-study"
-ok "command: claude-study"
+chmod +x "$BIN/studyloop"
+ok "command: studyloop"
 case ":$PATH:" in *":$BIN:"*) ;; *) warn "$BIN isn't on your PATH; the app below works anyway" ;; esac
 if [ "$(uname)" = "Darwin" ]; then
   mkdir -p "$HOME/Applications"
-  TARGET="$HOME/Applications/Claude Study.app"
+  TARGET="$HOME/Applications/Studyloop.app"
   rm -rf "$TARGET"
   osacompile -o "$TARGET" -e "do shell script quoted form of \"$PY\" & \" \" & quoted form of \"$APP/launch.py\" & \" >/dev/null 2>&1; true\"" >/dev/null 2>&1
-  ok "app: ~/Applications/Claude Study.app (also in Spotlight and Launchpad)"
-  if ask "Put a Claude Study shortcut on your Desktop too?"; then
-    ln -sfn "$TARGET" "$HOME/Desktop/Claude Study" && ok "Desktop shortcut"
+  ok "app: ~/Applications/Studyloop.app (also in Spotlight and Launchpad)"
+  if ask "Put a Studyloop shortcut on your Desktop too?"; then
+    ln -sfn "$TARGET" "$HOME/Desktop/Studyloop" && ok "Desktop shortcut"
   fi
 else
   mkdir -p "$HOME/.local/share/applications"
-  cat > "$HOME/.local/share/applications/claude-study.desktop" <<EOF
+  cat > "$HOME/.local/share/applications/studyloop.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Claude Study
+Name=Studyloop
 Comment=Open the study page
 Exec="$PY" "$APP/launch.py"
 Terminal=false
 Categories=Education;
 EOF
-  ok "menu entry: Claude Study"
+  ok "menu entry: Studyloop"
 fi
 
 # 5. What the skills need besides Python
@@ -134,4 +142,4 @@ fi
 
 bold "Done."
 echo "  Make study notes: open Claude in your course folder and type /study-vault"
-echo "  Study:            type /study, or open the Claude Study app"
+echo "  Study:            type /study, or open the Studyloop app"

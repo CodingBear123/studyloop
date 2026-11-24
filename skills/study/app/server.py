@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Study Tool: local quiz + progress page for StudyVaults.
+"""Studyloop: local quiz + progress page for StudyVaults.
 
 Serves index.html and a small JSON API. Standard library only, binds to 127.0.0.1.
 All vault reads and writes go through studyvault.py.
@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import notes as nt  # noqa: E402
 import studyvault as sv  # noqa: E402
+import updater as up  # noqa: E402
 
 FONT_NAMES = {p.name for p in (HERE / "fonts").glob("*.woff2")}
 
@@ -48,9 +49,17 @@ MODELS = tuple(m.strip() for m in os.environ.get("STUDY_CLAUDE_MODELS", "").spli
 MODEL_ID_RE = re.compile(r"^claude-[a-z0-9][a-z0-9.\-]{0,60}(\[1m\])?$")
 CLAUDE_MODEL = os.environ.get("STUDY_CLAUDE_MODEL", "sonnet")
 THEMES = ("tide", "dark", "garden")
+MAX_BODY = 5_000_000  # bytes; the largest legitimate body is a question bank
 # Theme and model live here too, not only in the browser: localStorage is per address, so
 # 127.0.0.1:8765, localhost:8765 and another port would each forget the choice.
-PREFS_FILE = Path(os.environ.get("STUDY_PREFS") or Path.home() / ".config" / "claude-study" / "prefs.json")
+PREFS_FILE = Path(os.environ.get("STUDY_PREFS") or Path.home() / ".config" / "studyloop" / "prefs.json")
+OLD_PREFS_FILE = Path.home() / ".config" / "claude-study" / "prefs.json"  # before the rename to Studyloop
+if not os.environ.get("STUDY_PREFS") and not PREFS_FILE.exists() and OLD_PREFS_FILE.is_file():
+    try:
+        PREFS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(OLD_PREFS_FILE, PREFS_FILE)
+    except OSError:
+        pass
 GRADE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -506,10 +515,44 @@ def make_handler(vaults):
             self.wfile.write(body)
 
         def body(self):
-            n = int(self.headers.get("Content-Length") or 0)
-            return json.loads(self.rfile.read(n) or b"{}")
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = -1
+            if not 0 <= n <= MAX_BODY:
+                raise ValueError(f"request body must be 0-{MAX_BODY // 1_000_000} MB")
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise ValueError("request body isn't JSON")
+            if not isinstance(data, dict):
+                raise ValueError("request body must be a JSON object")
+            return data
+
+        def refused(self, method):
+            """Why this request may not come from another website, or None if it may be served.
+
+            The server listens on 127.0.0.1 only, but any page in the browser can still send it requests.
+            A Host other than our own address means DNS rebinding (a page that can read our answers);
+            writes must come from the study page itself: JSON (needs a CORS preflight, which we refuse)
+            and, when the browser names it, our own Origin."""
+            port = self.server.server_address[1]
+            ours = {f"127.0.0.1:{port}", f"localhost:{port}"}
+            if (self.headers.get("Host") or "").lower() not in ours:
+                return "unknown Host; open the page at http://127.0.0.1:%d/" % port
+            if method in ("POST", "PUT"):
+                ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                if ctype != "application/json":
+                    return "Content-Type must be application/json"
+                origin = self.headers.get("Origin")
+                if origin is not None and origin.lower() not in {"http://" + h for h in ours}:
+                    return "requests from other websites are refused"
+            return None
 
         def handle_any(self, method):
+            why = self.refused(method)
+            if why:
+                return self.send(403, {"error": why})
             url = urlparse(self.path)
             q = parse_qs(url.query)
             p = url.path
@@ -525,6 +568,16 @@ def make_handler(vaults):
                     return self.send(200, [{"id": k, "path": str(a.vault), "subject": a.v.manifest.get("subject"),
                                             "claude_check": bool(CLAUDE), "models": list(MODELS),
                                             "default_model": pick_model(CLAUDE_MODEL)} for k, a in vaults.items()])
+                if p == "/api/update":
+                    if method == "GET":
+                        return self.send(200, up.status(force="check" in q))
+                    if method == "POST":
+                        res = up.apply()
+                        self.send(200, res)
+                        return up.restart_later(self.server)
+                if method == "POST" and p == "/api/restart":  # launch.py --restart, after editing the code
+                    self.send(200, {"ok": True})
+                    return up.restart_later(self.server)
                 if p == "/api/prefs":
                     if method == "GET":
                         return self.send(200, read_prefs())
@@ -581,6 +634,9 @@ def make_handler(vaults):
                 return self.send(404, {"error": "not found"})
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
+            except Exception as e:  # malformed input that slipped past the checks: answer instead of dropping the connection
+                self.log_message("error on %s %s: %r", method, self.path, e)
+                return self.send(500, {"error": "the server couldn't handle that request"})
 
         def do_GET(self):
             self.handle_any("GET")

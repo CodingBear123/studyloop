@@ -2,7 +2,7 @@
 name: study-vault
 description: >
   Build or update an Obsidian StudyVault from course material (lecture slides, PDFs, notes, old exams)
-  for claude-study-tool. Use when the user wants to turn course files into study notes, add new
+  for studyloop. Use when the user wants to turn course files into study notes, add new
   lecture material to an existing vault, convert an older /tutor-setup vault, or check a vault for
   broken data. Triggers: "/study-vault", "make a study vault", "set up my notes for studying",
   "add session 12 to my vault". Quizzing is /study.

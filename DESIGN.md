@@ -1,5 +1,5 @@
 ---
-name: Claude Study Tool
+name: Studyloop
 description: A neo-brutalist study desk of chunky printed blocks for quizzing and tracking progress.
 colors:
   navy-ink: "#14213D"
@@ -13,7 +13,7 @@ colors:
   slate-muted: "#4A5A72"
 ---
 
-# Claude Study Tool: design notes
+# Studyloop: design notes
 
 Carried over from the first (timer) version; the timer slab is gone, everything else keeps the same construction.
 

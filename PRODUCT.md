@@ -2,7 +2,7 @@
 
 ## Platform
 
-Claude Study Tool: two agent skills (`/study`, `/study-vault`) plus a local web app. `skills/study/app/server.py` (Python standard library) serves `index.html` plus fonts; every read and write of vault data goes through `studyvault.py`. Binds to 127.0.0.1 only. highlight.js comes from cdnjs; without a network, code keeps its indentation, just without colours.
+Studyloop: two agent skills (`/study`, `/study-vault`) plus a local web app. `skills/study/app/server.py` (Python standard library) serves `index.html` plus fonts; every read and write of vault data goes through `studyvault.py`. Binds to 127.0.0.1 only. highlight.js comes from cdnjs; without a network, code keeps its indentation, just without colours.
 
 ## Users
 

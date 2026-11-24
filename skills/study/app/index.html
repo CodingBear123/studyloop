@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Study Tool</title>
+<title>Studyloop</title>
 <meta name="theme-color" content="#2E6F87">
 <!--STUDY_PREFS-->
 <script>
@@ -39,10 +39,10 @@
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='5' width='24' height='24' fill='%2314213D'/%3E%3Crect x='2' y='2' width='24' height='24' fill='%232E6F87' stroke='%2314213D' stroke-width='3'/%3E%3Cpath d='M8 15l4 4 8-9' stroke='%23EEF4F2' stroke-width='3' fill='none' stroke-linecap='square'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" integrity="sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L" crossorigin="anonymous" referrerpolicy="no-referrer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous" referrerpolicy="no-referrer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
 @font-face { font-family: "Archivo Black"; src: url(/fonts/archivo-black-latin.woff2) format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Space Grotesk"; src: url(/fonts/space-grotesk-latin.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
@@ -542,6 +542,7 @@ a.link-btn { font-size: .92rem; }
 .askform .btn { flex: none; }
 .ask .note-hint { font-size: .85rem; margin: .5rem 0 0; }
 .ask .ask-h { font-size: 1.05rem; margin: 0 0 .7rem; }
+#update-btn { min-height: 2.6rem; }
 .modelpick { display: flex; align-items: center; gap: .45rem; font-weight: 700; font-size: .9rem; }
 .modelpick .field { width: auto; min-height: 2.6rem; padding: .3rem 2rem .3rem .6rem; }
 
@@ -574,13 +575,14 @@ a.link-btn { font-size: .92rem; }
 </svg>
 
 <header class="top">
-  <div class="mark"><span class="mark__tile" aria-hidden="true"><svg><use href="#i-check"/></svg></span><h1>Claude Study Tool</h1></div>
+  <div class="mark"><span class="mark__tile" aria-hidden="true"><svg><use href="#i-check"/></svg></span><h1>Studyloop</h1></div>
   <label class="sr-only" for="vault">Subject</label>
   <select id="vault" class="field"></select>
   <div class="stats">
     <p class="stat"><b id="today-count">0</b><span id="today-label">/ 12 questions today</span></p>
     <p class="stat stat--streak is-zero" id="streak-badge"><b id="streak-count">0</b><span>day streak</span></p>
   </div>
+  <button type="button" class="btn btn--sm btn--mint" id="update-btn" hidden>Update Studyloop</button>
   <label class="modelpick" id="modelpick" hidden><span>Claude</span><select id="model" class="field" aria-label="Claude model for checks and questions"></select></label>
   <div class="themes" role="group" aria-label="Theme">
     <button type="button" data-theme-pick="tide" title="Tide" aria-pressed="false"><span class="sw sw--tide" aria-hidden="true"></span><span class="sr-only">Tide</span></button>
@@ -1685,6 +1687,29 @@ function openEditor(idx) {
 
 function setURL(extra) { history.replaceState(null, "", "?" + new URLSearchParams({ vault, ...extra }).toString()); }
 
+// ---- updates: the server compares its git checkout with GitHub; one click pulls and restarts it ----
+async function checkUpdate() {
+  let u; try { u = await api("/api/update"); } catch (_) { return; }
+  const b = $("#update-btn");
+  if (!u.available) { b.hidden = true; return; }
+  const n = u.behind === 1 ? "1 change" : `${u.behind} changes`;
+  b.hidden = false;
+  b.title = `${n} on GitHub` + (u.changes.length ? ":\n" + u.changes.map(c => "• " + c).join("\n") : "") + (u.reason ? "\n\n" + u.reason : "");
+  b.onclick = async () => {
+    if (!u.can_update) return alert(u.reason);
+    if (!confirm(`Update Studyloop (${n})? The page reloads when it's done; nothing in your vaults changes.`)) return;
+    b.disabled = true; b.textContent = "Updating…";
+    try { await api("/api/update", { method: "POST", body: "{}" }); }
+    catch (e) { b.disabled = false; b.textContent = "Update Studyloop"; return alert(e.message); }
+    b.textContent = "Restarting…";
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      try { if ((await fetch("/api/vaults", { cache: "no-store" })).ok) return location.reload(); } catch (_) {}
+    }
+    b.textContent = "Restart failed: open Studyloop again";
+  };
+}
+
 // ---- boot ----
 (async () => {
   const p = new URLSearchParams(location.search);
@@ -1736,6 +1761,7 @@ function setURL(extra) { history.replaceState(null, "", "?" + new URLSearchParam
     catch (e) { toast("Round not found: " + p.get("round")); }
   }
   render();
+  checkUpdate();
 })();
 </script>
 </body>
