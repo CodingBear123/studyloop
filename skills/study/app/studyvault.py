@@ -32,7 +32,14 @@ DASHBOARD = "Learning Dashboard.md"
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 FOLDER_RE = re.compile(r"^(\d{2})[- ](.+)$")
-ROW_RE = re.compile(r"^\| (.+?) \| (\d+) \| (\d+) \| (\d{4}-\d{2}-\d{2}|-) \| (🔴|🟢|⚪) \|[ \t]*$", re.M)
+# Status words in the Status column. Internally a row's status is "open", "solved" or "untested";
+# files use the vault language's word. Older vaults used 🔴 🟢 ⚪, which still parse.
+STATUS_WORDS = {"en": {"open": "open", "solved": "solved", "untested": "untested"},
+                "de": {"open": "offen", "solved": "gelöst", "untested": "neu"}}
+LEGACY_STATUS = {"🔴": "open", "🟢": "solved", "⚪": "untested"}
+STATUS_CODE = dict(LEGACY_STATUS, **{w: k for d in STATUS_WORDS.values() for k, w in d.items()})
+_STATUS_ALT = "|".join(re.escape(w) for w in sorted(STATUS_CODE, key=len, reverse=True))
+ROW_RE = re.compile(r"^\| (.+?) \| (\d+) \| (\d+) \| (\d{4}-\d{2}-\d{2}|-) \| (" + _STATUS_ALT + r") \|[ \t]*$", re.M)
 SEP_RE = re.compile(r"^\|[-:| ]+\|\s*$")
 NOTE_RE = re.compile(r"^\*\*(.+?)\*\*\s*\n((?:- .*\n?)+)", re.M)
 WIKI_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
@@ -114,8 +121,18 @@ def slugify(text):
 def badge(rate, lang="en"):
     w = labels(lang)["levels"]
     if rate is None:
-        return f"⬜ {w[4]}"
-    return f"🟥 {w[0]}" if rate < 40 else f"🟨 {w[1]}" if rate < 70 else f"🟩 {w[2]}" if rate < 90 else f"🟦 {w[3]}"
+        return w[4]
+    return w[0] if rate < 40 else w[1] if rate < 70 else w[2] if rate < 90 else w[3]
+
+
+def status_word(code, lang="en"):
+    return STATUS_WORDS.get((lang or "en")[:2], STATUS_WORDS["en"])[code]
+
+
+def restatus(text, lang="en"):
+    """Rewrite every status cell of a tracker table in the vault language (old emoji included)."""
+    return ROW_RE.sub(lambda m: m[0][:m.start(5) - m.start()] + status_word(STATUS_CODE[m[5]], lang)
+                      + m[0][m.end(5) - m.start():], text)
 
 
 def pct(rate):
@@ -224,8 +241,8 @@ def split_notes(text):
 
 def parse_concepts_text(text):
     table, _, notes_part = split_notes(text)
-    rows = [{"name": m[1].strip(), "attempts": int(m[2]), "correct": int(m[3]), "last": m[4], "status": m[5]}
-            for m in ROW_RE.finditer(table)]
+    rows = [{"name": m[1].strip(), "attempts": int(m[2]), "correct": int(m[3]), "last": m[4],
+             "status": STATUS_CODE[m[5]]} for m in ROW_RE.finditer(table)]
     notes = {m[1].strip().lower(): m[2].strip() for m in NOTE_RE.finditer(notes_part)}
     return rows, notes
 
@@ -250,7 +267,7 @@ def render_note(concept, confusion, key_point, lang="en"):
 def apply_answer(text, concept, correct, confusion, key_point, today, lang="en"):
     """Return the concept-file text with one graded answer applied."""
     L = labels(lang)
-    status = "🟢" if correct else "🔴"
+    status = status_word("solved" if correct else "open", lang)
     table, _, _ = split_notes(text)
     hit = next((m for m in ROW_RE.finditer(table) if m[1].strip().lower() == concept.lower()), None)
     if hit:
@@ -279,6 +296,7 @@ def apply_answer(text, concept, correct, confusion, key_point, today, lang="en")
             for ph in PLACEHOLDERS:
                 text = text.replace(ph + "\n", "").replace(ph, "")
             text = text.rstrip("\n") + "\n\n" + note + "\n"
+    text = restatus(text, lang)
     return text if text.endswith("\n") else text + "\n"
 
 
@@ -298,14 +316,14 @@ def lenient_rows(table):
         if not (att.isdigit() and cor.isdigit()):
             raise ValueError(f"can't read row: {line[:80]}")
         last = last if re.match(r"^\d{4}-\d{2}-\d{2}$", last) else "-"
-        status = status if status in ("🔴", "🟢", "⚪") else ("⚪" if int(att) == 0 else "🔴")
+        status = STATUS_CODE.get(status) or STATUS_CODE.get(status.lower()) or ("untested" if int(att) == 0 else "open")
         rows.append({"name": clean_cell(name), "attempts": int(att), "correct": int(cor), "last": last,
                      "status": status})
     return rows
 
 
 def normalize_tracker(text, title, lang="en"):
-    """Rewrite an older tracker in the canonical format. Returns (text, notes added for 🔴 rows)."""
+    """Rewrite an older tracker in the canonical format. Returns (text, notes added for open rows)."""
     L = labels(lang)
     table, _, notes_part = split_notes(text)
     rows = lenient_rows(table)
@@ -338,13 +356,13 @@ def normalize_tracker(text, title, lang="en"):
                             count=1, flags=re.M | re.I)
     added = []
     for r in rows:
-        if r["status"] == "🔴" and r["name"].lower() not in notes:
+        if r["status"] == "open" and r["name"].lower() not in notes:
             missing = {"en": ("not recorded (tracker migrated from an older format)", "reread the area notes"),
                        "de": ("nicht erfasst (Tracker aus älterem Format übernommen)",
                               "Bereichsnotizen nochmals lesen")}[lang if lang in ("en", "de") else "en"]
             notes_part += ("\n\n" if notes_part else "") + render_note(r["name"], *missing, lang=lang)
             added.append(r["name"])
-    body = "\n".join(f"| {r['name']} | {r['attempts']} | {r['correct']} | {r['last']} | {r['status']} |"
+    body = "\n".join(f"| {r['name']} | {r['attempts']} | {r['correct']} | {r['last']} | {status_word(r['status'], lang)} |"
                      for r in rows)
     out = f"# {title} — {L['tracker']}\n\n" + (preamble + "\n\n" if preamble else "")
     out += f"{table_head(L)}\n" + (body + "\n" if body else "")
@@ -515,14 +533,14 @@ class Vault:
             if rate is not None and a["slug"] not in excluded:
                 rates[a["title"]] = rate
             T, C = T + att, C + cor
-            unres += sum(r["status"] == "🔴" for r in rows)
-            res += sum(r["status"] == "🟢" for r in rows)
-            untested += sum(r["status"] == "⚪" for r in rows)
+            unres += sum(r["status"] == "open" for r in rows)
+            res += sum(r["status"] == "solved" for r in rows)
+            untested += sum(r["status"] == "untested" for r in rows)
             areas.append({"slug": a["slug"], "title": a["title"], "excluded": bool(a.get("excluded")),
                           "attempts": att, "correct": cor, "rate": rate, "level": badge(rate, lang),
-                          "concepts": len(rows), "untested": [r["name"] for r in rows if r["status"] == "⚪"],
+                          "concepts": len(rows), "untested": [r["name"] for r in rows if r["status"] == "untested"],
                           "open": [dict(r, note=notes.get(r["name"].lower(), ""))
-                                   for r in rows if r["status"] == "🔴"]})
+                                   for r in rows if r["status"] == "open"]})
         tr = int(100 * C / T + 0.5) if T else None
         # min/max keep the first of equal rates, in manifest order
         weak = min(rates, key=rates.get) if rates else "-"
@@ -537,8 +555,8 @@ class Vault:
         intro = f"{subject}: {L['dash_intro']}" if subject else L["dash_intro"][0].upper() + L["dash_intro"][1:]
         cols = L["cols"]
         lv = L["levels"]
-        legend = (f"> 🟥 {lv[0]} (0-39%) · 🟨 {lv[1]} (40-69%) · 🟩 {lv[2]} (70-89%) · "
-                  f"🟦 {lv[3]} (90-100%) · ⬜ {lv[4]}")
+        legend = (f"> {lv[0]} 0-39% · {lv[1]} 40-69% · {lv[2]} 70-89% · "
+                  f"{lv[3]} 90-100% · {lv[4]}: no answers yet")
         lines = ["# Learning Dashboard", "", f"> {intro}", "", "---", "", f"## {L['by_area']}", "",
                  "| " + " | ".join(cols) + " |", "|" + "|".join("-" * (len(c) + 2) for c in cols) + "|"]
         for a in st["areas"]:
@@ -557,6 +575,13 @@ class Vault:
         return "\n".join(lines)
 
     def recompute(self):
+        # trackers from before the status words: rewrite 🔴 🟢 ⚪ in place
+        for p in sorted(self.concepts_dir.glob("*.md")) if self.concepts_dir.is_dir() else []:
+            text = p.read_text(encoding="utf-8")
+            if any(e in text for e in LEGACY_STATUS):
+                new = restatus(text, self.lang)
+                if new != text:
+                    write_text(p, new)
         st = self.stats()
         write_text(self.dashboard, self.render_dashboard(st))
         return {k: st[k] for k in ("total", "correct", "rate", "unresolved", "resolved", "untested",
@@ -707,9 +732,9 @@ class Vault:
                 E.append(f"concepts/{s}.md: duplicate concept {n!r}")
             for r in rows:
                 tag = f"concepts/{s}.md: {r['name']!r}"
-                if r["status"] == "⚪":
+                if r["status"] == "untested":
                     if r["attempts"] or r["correct"] or r["last"] != "-":
-                        E.append(f"{tag}: ⚪ (untested) needs 0 | 0 | - ")
+                        E.append(f"{tag}: untested needs 0 | 0 | - ")
                     continue
                 if r["attempts"] < 1 or r["correct"] > r["attempts"]:
                     E.append(f"{tag}: correct {r['correct']} / attempts {r['attempts']} is impossible")
@@ -717,10 +742,10 @@ class Vault:
                     date.fromisoformat(r["last"])
                 except ValueError:
                     E.append(f"{tag}: bad date {r['last']!r}")
-                if r["status"] == "🔴" and r["name"].lower() not in notes:
-                    E.append(f"{tag}: 🔴 without an error note")
-                if r["status"] == "🔴" and r["correct"] == r["attempts"]:
-                    W.append(f"{tag}: 🔴 but every attempt was correct")
+                if r["status"] == "open" and r["name"].lower() not in notes:
+                    E.append(f"{tag}: open without an error note")
+                if r["status"] == "open" and r["correct"] == r["attempts"]:
+                    W.append(f"{tag}: open but every attempt was correct")
             for n in notes:
                 if n not in names:
                     W.append(f"concepts/{s}.md: error note {n!r} has no table row")

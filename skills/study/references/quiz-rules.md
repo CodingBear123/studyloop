@@ -34,7 +34,7 @@ Use the kinds the vault's past exams use. For code subjects, at least half of a 
 - Drill: medium 30%, hard 70%
 - Area review and exam simulation: even, or the exam's own mix
 
-## Drilling 🔴 concepts
+## Drilling open concepts
 
 - Never repeat the old question. Test the same idea from a new angle or in a new program.
 - Use the error note: if the user confused X with Y, build a case where only X gives the right answer.

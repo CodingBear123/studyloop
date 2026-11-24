@@ -64,7 +64,7 @@ This writes `studyvault.json`, the folders, empty trackers, empty banks and the 
 extra folders (e.g. `11-Past-Exams`) to the manifest by hand afterwards. Pass `--language de` for German
 material (German structure words in trackers and dashboard).
 
-Optional: list each area's key concepts in its tracker as untested rows (`| name | 0 | 0 | - | ⚪ |`), so
+Optional: list each area's key concepts in its tracker as untested rows (`| name | 0 | 0 | - | untested |`), so
 `/study` can run diagnostics concept by concept. This is the only time a tracker is written by hand; run
 `check` afterwards.
 

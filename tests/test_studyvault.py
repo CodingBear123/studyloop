@@ -47,17 +47,17 @@ class VaultTests(unittest.TestCase):
         ], today="2026-11-24")
         rows, notes = self.v.concepts("closures")
         self.assertEqual([(r["name"], r["attempts"], r["correct"], r["status"]) for r in rows],
-                         [("late binding", 1, 0, "🔴"), ("nonlocal", 1, 1, "🟢")])
+                         [("late binding", 1, 0, "open"), ("nonlocal", 1, 1, "solved")])
         self.assertIn("late binding", notes)
         self.assertNotIn(sv.PLACEHOLDER, self.v.concept_path("closures").read_text())
         st = self.v.stats()
         self.assertEqual((st["total"], st["correct"], st["rate"], st["unresolved"]), (2, 1, 50, 1))
         self.assertEqual(self.v.check()[0], [])
-        # right the second time: 🟢, note kept as history
+        # right the second time: solved, note kept as history
         self.v.record([{"area": "closures", "concept": "Late Binding", "correct": True}], today="2026-11-25")
         rows, notes = self.v.concepts("closures")
         self.assertEqual((rows[0]["name"], rows[0]["attempts"], rows[0]["correct"], rows[0]["status"]),
-                         ("late binding", 2, 1, "🟢"))
+                         ("late binding", 2, 1, "solved"))
         self.assertIn("late binding", notes)
         self.assertEqual(self.v.check()[0], [])
 
@@ -164,7 +164,7 @@ class OldFormatTests(unittest.TestCase):
         v = sv.Vault(self.root)
         self.assertEqual(v.check(), ([], []))
         rows, notes = v.concepts("mengen")
-        self.assertEqual([r["status"] for r in rows], ["🔴", "⚪", "🔴"])
+        self.assertEqual([r["status"] for r in rows], ["open", "untested", "open"])
         self.assertEqual(rows[0]["name"], "Betrag ∣x∣")
         self.assertEqual(v.stats()["total"], 3)
         text = v.concept_path("mengen").read_text()
@@ -184,7 +184,7 @@ class OldFormatTests(unittest.TestCase):
         v.record([{"area": "mengen", "concept": "O(|Q|²) Laufzeit", "correct": False,
                    "confusion": "x", "key_point": "y"}], today="2026-11-24")
         rows, notes = v.concepts("mengen")
-        self.assertEqual((rows[1]["attempts"], rows[1]["last"], rows[1]["status"]), (1, "2026-11-24", "🔴"))
+        self.assertEqual((rows[1]["attempts"], rows[1]["last"], rows[1]["status"]), (1, "2026-11-24", "open"))
         self.assertIn("- Verwechslung: x", v.concept_path("mengen").read_text())
         self.assertEqual(v.check()[0], [])
 
@@ -212,7 +212,7 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(latest["tracked"])
         self.assertTrue(latest["answers"][0]["recorded"])
         rows, notes = self.app.v.concepts("closures")
-        self.assertEqual(rows[0]["status"], "🔴")
+        self.assertEqual(rows[0]["status"], "open")
         self.assertIn("because", notes["late binding"])
         self.assertEqual(self.app.v.check()[0], [])
 
@@ -259,7 +259,7 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(latest["tracked"])
         self.assertEqual(latest["tracked_count"], 2)
         status = {r["name"]: r["status"] for r in self.app.v.concepts("closures")[0]}
-        self.assertEqual(status, {"free variables": "🟢", "cell objects": "🔴"})
+        self.assertEqual(status, {"free variables": "solved", "cell objects": "open"})
         text = "\n".join(server.question_text(dict(k, type="kprim")))
         self.assertIn("STATEMENTS", text)
         self.assertIn("CORRECT:", text)
@@ -275,7 +275,7 @@ class ServerTests(unittest.TestCase):
         r = self.app.grade_open({"round_id": rid, "n": 1, "mode": "self", "correct": False})
         self.assertEqual((r["correct"], r["tracked"]), (False, True))
         rows, notes = self.app.v.concepts("closures")
-        self.assertEqual((rows[0]["name"], rows[0]["status"]), ("cell objects", "🔴"))
+        self.assertEqual((rows[0]["name"], rows[0]["status"]), ("cell objects", "open"))
         self.assertIn("no idea", notes["cell objects"])
         latest = sv.load_json(self.app.v.bank_dir / "results" / "latest.json")
         self.assertTrue(latest["answers"][0]["recorded"] and latest["tracked"])
@@ -293,7 +293,7 @@ class ServerTests(unittest.TestCase):
         finally:
             server.ask_claude = real
         self.assertEqual((r["correct"], r["feedback"]), (True, "Yes."))
-        self.assertEqual(self.app.v.concepts("closures")[0][0]["status"], "🟢")
+        self.assertEqual(self.app.v.concepts("closures")[0][0]["status"], "solved")
 
     def test_notes_tree_read_and_question_refs(self):
         folder = self.app.v.path / "01-Closures"
@@ -533,3 +533,17 @@ class UpdaterTests(unittest.TestCase):
         self.assertEqual((ours / "SKILL.md").read_text(), "v1")
         self.assertTrue((ours / ".studyloop").exists())
         self.assertEqual((theirs / "SKILL.md").read_text(), "someone else's")
+
+
+class StatusWordTests(unittest.TestCase):
+    def test_restatus_rewrites_old_emoji(self):
+        text = sv.TABLE_HEAD + "\n| x | 1 | 1 | 2026-11-24 | 🟢 |\n| y | 1 | 0 | 2026-11-24 | 🔴 |\n| z | 0 | 0 | - | ⚪ |\n"
+        self.assertIn("| solved |", sv.restatus(text))
+        self.assertIn("| open |", sv.restatus(text))
+        self.assertIn("| neu |", sv.restatus(text, "de"))
+        rows, _ = sv.parse_concepts_text(sv.restatus(text, "de"))
+        self.assertEqual([r["status"] for r in rows], ["solved", "open", "untested"])
+
+    def test_badge_has_no_emoji(self):
+        self.assertEqual(sv.badge(50), "Fair")
+        self.assertEqual(sv.badge(None, "de"), "Ungemessen")

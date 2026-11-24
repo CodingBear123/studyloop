@@ -25,6 +25,8 @@ write to tracking data goes through one script.
   Skip areas marked `"excluded": true` unless the user asks for them.
 - Read `references/quiz-rules.md` before writing any question. Zero hints.
 - Talk in the user's language. Files keep their English names and keys.
+- No emoji anywhere: not in round titles, questions, feedback, error notes or chat. Write status as words
+  (`open`, `solved`, `untested`; levels Weak, Fair, Good, Mastered) and right/wrong as words or ✓ ✗.
 - Don't use AskUserQuestion for quiz questions (it strips indentation and hides the chat). Use it only
   for the session choice, and only when the choice is unclear from the user's message.
 
@@ -40,13 +42,13 @@ write to tracking data goes through one script.
 
 ## 2. Pick the session
 
-Build the choice from `status` (rates, 🔴 open concepts, unmeasured ⬜ areas). Skip the question if the
+Build the choice from `status` (rates, open concepts, unmeasured areas). Skip the question if the
 user already said what they want.
 
 | Session | When | Round |
 |---|---|---|
-| **Diagnostic** | ⬜ areas or ⚪ untested concepts exist | 1 question per unmeasured area, or ⚪ concepts (use their exact names), easy/medium |
-| **Drill** | 🟥/🟨 areas or 🔴 concepts | 🔴 concepts rephrased in new contexts, medium/hard |
+| **Diagnostic** | unmeasured areas or untested concepts exist | 1 question per unmeasured area, or untested concepts (use their exact names), easy/medium |
+| **Drill** | Weak/Fair areas or open concepts | open concepts rephrased in new contexts, medium/hard |
 | **Area** | user names a topic | 4 questions from that area |
 | **Exam simulation** | user asks, or near the exam | mix in the shape of `Exam Blueprint.md` / `11-Past-Exams/`, open questions included |
 | **Study plan** | "I have N hours" | see below |
@@ -59,10 +61,10 @@ tick them off. Stop when the user says pause; the tasks stay for next time.
 
 ## 3. Write the round
 
-1. Read the area notes in the area's `folder` (from the manifest) and, when drilling, the 🔴 rows and error
+1. Read the area notes in the area's `folder` (from the manifest) and, when drilling, the open rows and error
    notes from `status`.
 2. Look at `question-bank/{area}.json`. Reuse at most 2 bank questions per round via `bank_ref`, preferring
-   ones on 🔴 concepts.
+   ones on open concepts.
 3. Write the rest yourself: 4 questions per round by default, mixing the types in `references/quiz-rules.md`
    (`single`, `multi`, `kprim`, `numeric`, `open`) in the proportions the old exams use. For code subjects prefer
    output prediction and debugging with real, indented code in the `code` field.
@@ -92,7 +94,7 @@ Format: `references/app.md`.
 2. Grade `single`, `multi`, `kprim` and `numeric` against your key (a multi or Kprim answer is right only if
    every box is right; for Kprim also say how many of the 4 were right, since exams give half points for 3)
    and open answers against the notes. Partly right counts as wrong for tracking, but say what was right.
-3. Show a table (question, correct answer, their answer, ✅/❌), then a short explanation for each miss, with
+3. Show a table (question, correct answer, their answer, right/wrong), then a short explanation for each miss, with
    code in fenced blocks and a `[[note]]` to reread.
 
 Practice rounds the user starts from the page (`source: "bank"`) are graded by the server: answers with
@@ -115,7 +117,7 @@ python3 APP/studyvault.py record VAULT /tmp/graded.json
    {"area": "java", "concept": "checked exceptions", "correct": true}]}
 ```
 
-It updates the concept rows (new row, 🔴→🟢 when right, 🟢→🔴 when wrong again, error notes), recomputes
+It updates the concept rows (new row, open→solved when right, solved→open when wrong again, error notes), recomputes
 `Learning Dashboard.md`, and marks the results file as tracked. Don't include answers that already have
 `"recorded": true`. If it rejects the input, fix the JSON, don't hand-edit files.
 

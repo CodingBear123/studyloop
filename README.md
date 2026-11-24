@@ -41,8 +41,8 @@ bank never drift apart. `studyvault.py check` proves it.
    Code keeps its indentation there and formulas render. Open it any time with the Studyloop app, also
    without Claude: practice rounds from the question bank, your notes, your progress.
 3. **Track.** Claude grades the round, explains every miss with a link to the note section to reread, and
-   records each answer in the concept tracker: 🔴 concepts you got wrong, 🟢 once you get them right. The next
-   round targets the 🔴 ones. Practice rounds you start on the page are graded by the page and recorded the
+   records each answer in the concept tracker: `open` concepts you got wrong, `solved` once you get them right. The next
+   round targets the open ones. Practice rounds you start on the page are graded by the page and recorded the
    same way; for open answers it can ask Claude for a check, and every question and note has an "Ask Claude"
    button. (The page calls Claude Code in the background for these, so they need it installed and signed in.)
 

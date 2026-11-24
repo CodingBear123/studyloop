@@ -57,8 +57,8 @@ the manifest and creates the missing tracker and bank files). Never rename a slu
 
 | Concept | Attempts | Correct | Last Tested | Status |
 |---------|----------|---------|-------------|--------|
-| naive save aliasing | 2 | 0 | 2026-11-24 | 🔴 |
-| dispatch by type name | 1 | 1 | 2026-11-24 | 🟢 |
+| naive save aliasing | 2 | 0 | 2026-11-24 | open |
+| dispatch by type name | 1 | 1 | 2026-11-24 | solved |
 
 ### Error Notes
 
@@ -67,11 +67,11 @@ the manifest and creates the missing tracker and bank files). Never rename a slu
 - Key point: the correct idea
 ```
 
-- Status is the result of the **last** attempt: 🟢 right, 🔴 wrong. ⚪ means planned but not tested yet:
-  `| name | 0 | 0 | - | ⚪ |` (a vault may list every concept of an area up front; /study uses them for
-  diagnostics, and the first answer turns the row 🟢 or 🔴).
+- Status is the result of the **last** attempt: `solved` right, `open` wrong. `untested` means planned but not tested yet:
+  `| name | 0 | 0 | - | untested |` (a vault may list every concept of an area up front; /study uses them for
+  diagnostics, and the first answer turns the row solved or open).
 - Concept names never contain `|`; use `∣` (U+2223), which `record` substitutes automatically.
-- Every 🔴 row has an error note. Notes stay when the concept turns 🟢 (learning history); a new miss
+- Every open row has an error note. Notes stay when the concept turns solved (learning history); a new miss
   replaces the note.
 - Only `studyvault.py record` writes these files.
 
@@ -90,7 +90,7 @@ heading and bullet labels, and the dashboard's headings and levels. German track
   keeping every number, note and any text above the table; `\|` and `|` in names become `∣`; `—` dates of
   untested rows become `-`
 - pairs error notes whose title drifted from the row name (by similarity) and adds a marked placeholder note
-  only for a 🔴 row that has none
+  only for an open row that has none
 - moves old dashboards (`Lern-Dashboard.md`, `00-Dashboard/Learning Dashboard.md`, a hand-written one) and old
   tracker files to `StudyVault/.migrated-<date>/`, and rewrites links to them
 - is idempotent: running it again changes nothing
@@ -99,7 +99,9 @@ heading and bullet labels, and the dashboard's headings and levels. German track
 
 Generated. One row per manifest area, in manifest order: correct, wrong, rate, level, `[[concepts/<slug>]]`;
 then a total row and Stats (total questions, cumulative rate, unresolved and resolved concepts, weakest and
-strongest area). Levels: 🟥 Weak 0–39% · 🟨 Fair 40–69% · 🟩 Good 70–89% · 🟦 Mastered 90–100% · ⬜ Unmeasured.
+strongest area). Levels: Weak 0–39% · Fair 40–69% · Good 70–89% · Mastered 90–100% · Unmeasured.
+Status words in a German vault (`"language": "de"`): `offen`, `gelöst`, `neu`. Older vaults used 🔴 🟢 ⚪ and
+🟥 🟨 🟩 🟦 ⬜; they still parse, and `recompute` rewrites them as words.
 Anything you write in it is overwritten by the next `recompute`; put notes in `00-Dashboard/` instead.
 
 ## Question bank, rounds, results
@@ -113,8 +115,8 @@ except `open` needs `answer` (its shape depends on the type, see `app.md`), and 
 Errors (exit code 1):
 - manifest missing or invalid; duplicate or malformed slugs; an area folder that doesn't exist
 - a concept tracker or bank file without a manifest area, or an area without a tracker
-- malformed tracker rows, duplicate concepts, `correct > attempts`, bad dates, 🔴 without an error note,
-  ⚪ rows that aren't `0 | 0 | -`
+- malformed tracker rows, duplicate concepts, `correct > attempts`, bad dates, open rows without an error note,
+  untested rows that aren't `0 | 0 | -`
 - invalid bank JSON, wrong `area` key, duplicate ids, invalid questions, a question without `answer` (except open)
 - invalid results JSON or `tasks.json`
 - `Learning Dashboard.md` missing or different from what `recompute` would write

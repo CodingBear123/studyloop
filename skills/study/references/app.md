@@ -18,7 +18,7 @@ It finds vaults at startup, so restart it after creating one. Port taken → it'
 - **Notes**: every note of the vault rendered from its Markdown (headings, tables, callouts with folds, code,
   `[[wiki links]]`, `![[images]]`, `$math$` and `$$math$$` via KaTeX), with a filter and an "Open in Obsidian" link. Deep link:
   `?view=notes&note=<path in the vault>&h=<heading anchor>`.
-- **Progress**: rate per area and the 🔴 concepts with their error notes, streak of answers per day.
+- **Progress**: rate per area and the open concepts with their error notes, streak of answers per day.
 - **Question bank**: add and edit questions per area (validated by `studyvault.py` before saving).
 
 API (all take `?vault=<id>`): `GET /api/vaults`, `GET /api/areas`, `GET /api/progress`,
@@ -110,7 +110,7 @@ indexes match your key.
 
 ## Bank practice rounds
 
-The server picks questions at random, weights ones whose concept is 🔴 four times higher, prefers questions
+The server picks questions at random, weights ones whose concept is open four times higher, prefers questions
 seen less often, shuffles options and reveals answers after submit. A new error note from a practice round
 uses the option the user picked as the confusion and the question's `explanation` as the key point, so give
 bank questions a useful `explanation` and a `concept`.

@@ -278,7 +278,7 @@ class App:
             rows, _ = self.v.concepts(a["slug"])
             out.append({"slug": a["slug"], "title": a["title"], "excluded": bool(a.get("excluded")),
                         "count": len(self.v.bank(a["slug"]).get("questions", [])),
-                        "unresolved": sum(r["status"] == "🔴" for r in rows)})
+                        "unresolved": sum(r["status"] == "open" for r in rows)})
         return out
 
     def get_bank(self, slug):
@@ -286,7 +286,7 @@ class App:
         return self.v.bank(slug)
 
     def sample_round(self, slugs, n, types):
-        """Pick n bank questions; weight 🔴 concepts ×4 and prefer ones seen less often."""
+        """Pick n bank questions; weight open concepts ×4 and prefer ones seen less often."""
         seen = {}
         for r in self.v.results():
             for a in r.get("answers", []):
@@ -296,7 +296,7 @@ class App:
         for slug in slugs:
             self.need_area(slug)
             rows, _ = self.v.concepts(slug)
-            red = {r["name"].lower() for r in rows if r["status"] == "🔴"}
+            red = {r["name"].lower() for r in rows if r["status"] == "open"}
             for q in self.v.bank(slug).get("questions", []):
                 if types and q.get("type") not in types:
                     continue
