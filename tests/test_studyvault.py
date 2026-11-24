@@ -113,12 +113,69 @@ class VaultTests(unittest.TestCase):
         (old / "concepts" / "topic-one.md").write_text(
             "# T\n\n" + sv.TABLE_HEAD + "\n| a | 2 | 1 | 2026-11-20 | 🟢 |\n\n### Error Notes\n")
         (old / sv.DASHBOARD).write_text("| Topic One | 1 | 1 | 50% | 🟨 Fair | [[concepts/topic-one]] |\n")
-        data, _ = sv.migrate_vault(old, write=True)
+        data, _, _ = sv.migrate_vault(old, write=True)
         self.assertEqual(data["areas"], [{"slug": "topic-one", "title": "Topic One", "folder": "01-Topic-One"}])
         self.assertEqual(data["extra_folders"], ["00-Dashboard"])
         v = sv.Vault(old)
         self.assertEqual(v.check()[0], [])
         self.assertEqual(v.stats()["rate"], 50)
+
+
+class OldFormatTests(unittest.TestCase):
+    """Trackers written by older /tutor versions, as found in real vaults."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "Mathe" / "StudyVault"
+        (self.root / "01 Mengen").mkdir(parents=True)
+        (self.root / "01 Mengen" / "Kprim 1.1.md").write_text("x")
+        (self.root / "concepts").mkdir()
+        (self.root / "concepts" / "01 Mengen.md").write_text(
+            "# 01 Mengen – Konzept-Tracker\n\n> Notiz oben.\n\n"
+            "| Konzept | Versuche | Richtig | Zuletzt getestet | Status |\n|---|---|---|---|---|\n"
+            "| Betrag \\|x\\| | 2 | 0 | 2026-11-18 | 🔴 |\n"
+            "| O(|Q|²) Laufzeit | 0 | 0 | — | ⚪ |\n"
+            "| Teilmenge vs. Element (Definition) | 1 | 0 | 2026-11-18 | 🔴 |\n\n"
+            "### Fehlernotizen\n\n**Betrag |x|**\n- Verwechslung: a\n- Kernpunkt: b\n\n"
+            "**Teilmenge vs. Element**\n- Verwechslung: c\n- Kernpunkt: d\n")
+        (self.root / "Lern-Dashboard.md").write_text(
+            "| 01 Mengen | 0 | 3 | 0% | 🟥 Schwach | [[concepts/01 Mengen]] |\n")
+        (self.root / "notes.md").write_text("see [[concepts/01 Mengen]] and [[Lern-Dashboard]]\n")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_migrate_converts_and_keeps_numbers(self):
+        data, _, plan = sv.migrate_vault(self.root, write=True)
+        self.assertEqual(data["language"], "de")
+        self.assertEqual(plan["renamed"], {"01 Mengen.md": "mengen.md"})
+        self.assertIn("Teilmenge vs. Element (Definition)", plan["notes_paired"]["mengen.md"].values())
+        v = sv.Vault(self.root)
+        self.assertEqual(v.check(), ([], []))
+        rows, notes = v.concepts("mengen")
+        self.assertEqual([r["status"] for r in rows], ["🔴", "⚪", "🔴"])
+        self.assertEqual(rows[0]["name"], "Betrag ∣x∣")
+        self.assertEqual(v.stats()["total"], 3)
+        text = v.concept_path("mengen").read_text()
+        self.assertIn("> Notiz oben.", text)
+        self.assertIn("### Fehlernotizen", text)
+        self.assertIn("Stand pro Bereich", v.dashboard.read_text())
+        self.assertIn("[[concepts/mengen]] and [[Learning Dashboard]]", (self.root / "notes.md").read_text())
+        self.assertFalse((self.root / "Lern-Dashboard.md").exists())
+        self.assertEqual(len(list(self.root.glob(".migrated-*/Lern-Dashboard.md"))), 1)
+        # running it again changes nothing
+        _, _, again = sv.migrate_vault(self.root)
+        self.assertEqual((again["renamed"], again["normalized"], again["moved"]), ({}, [], []))
+
+    def test_untested_row_becomes_tested(self):
+        sv.migrate_vault(self.root, write=True)
+        v = sv.Vault(self.root)
+        v.record([{"area": "mengen", "concept": "O(|Q|²) Laufzeit", "correct": False,
+                   "confusion": "x", "key_point": "y"}], today="2026-11-24")
+        rows, notes = v.concepts("mengen")
+        self.assertEqual((rows[1]["attempts"], rows[1]["last"], rows[1]["status"]), (1, "2026-11-24", "🔴"))
+        self.assertIn("- Verwechslung: x", v.concept_path("mengen").read_text())
+        self.assertEqual(v.check()[0], [])
 
 
 class ServerTests(unittest.TestCase):

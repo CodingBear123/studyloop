@@ -45,7 +45,7 @@ user already said what they want.
 
 | Session | When | Round |
 |---|---|---|
-| **Diagnostic** | ⬜ areas exist | 1 question per unmeasured area, easy/medium |
+| **Diagnostic** | ⬜ areas or ⚪ untested concepts exist | 1 question per unmeasured area, or ⚪ concepts (use their exact names), easy/medium |
 | **Drill** | 🟥/🟨 areas or 🔴 concepts | 🔴 concepts rephrased in new contexts, medium/hard |
 | **Area** | user names a topic | 4 questions from that area |
 | **Exam simulation** | user asks, or near the exam | mix in the shape of `Exam Blueprint.md` / `11-Past-Exams/`, open questions included |

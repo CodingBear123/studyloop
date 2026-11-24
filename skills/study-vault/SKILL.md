@@ -61,7 +61,12 @@ python3 TOOL init VAULT --subject "Software Construction" --scope "..." \
 ```
 
 This writes `studyvault.json`, the folders, empty trackers, empty banks and the dashboard. Add `exam` and
-extra folders (e.g. `11-Past-Exams`) to the manifest by hand afterwards.
+extra folders (e.g. `11-Past-Exams`) to the manifest by hand afterwards. Pass `--language de` for German
+material (German structure words in trackers and dashboard).
+
+Optional: list each area's key concepts in its tracker as untested rows (`| name | 0 | 0 | - | ⚪ |`), so
+`/study` can run diagnostics concept by concept. This is the only time a tracker is written by hand; run
+`check` afterwards.
 
 ### 4. Notes (per area, in its folder)
 
@@ -114,8 +119,9 @@ exam with the questions, the answers, and links to the notes that cover each que
    dashboard and the tracker files. Check it with the user: titles, which folders are areas, the subject name,
    the scope (copy it from the blueprint if there is one).
 2. `python3 TOOL migrate VAULT --write`, then fill in `subject`, `scope`, `exam` in the manifest.
-3. `python3 TOOL recompute VAULT` and `check VAULT`; fix errors. Tracking numbers must not change; compare the
-   dashboard totals before and after.
+3. `python3 TOOL check VAULT`; fix errors. Tracking numbers must not change: compare the totals of the old
+   dashboard (now in `.migrated-<date>/`) with `TOOL status VAULT`, area by area. Report paired notes and any
+   placeholder notes to the user. Old dashboard totals can themselves be wrong; trust the per-area sums.
 4. Bank questions without a `concept` will show as warnings: add concepts so practice rounds can track them.
 
 ## Language
