@@ -208,24 +208,35 @@ h2 { font-size: 1.5rem; font-weight: var(--h-weight); letter-spacing: -.015em; l
 .empty { border: var(--rule) dashed var(--field-line); border-radius: var(--radius-ctl); padding: 1.25rem; font-weight: 600; text-align: center; }
 
 /* ---------- top bar + tabs ---------- */
-.top { position: relative; display: flex; align-items: center; gap: 1rem 1.25rem; flex-wrap: wrap; max-width: 1240px; margin: 0 auto;
-  padding: var(--pad) calc(var(--pad) + 9.5rem) 0 var(--pad); min-height: calc(var(--pad) + 2.9rem); }
+/* Header grid: brand + subject on the left, settings (update, Claude model, theme) on the right.
+   The layout only changes at fixed window widths, never with a theme's font, so nothing jumps when switching. */
+.top { display: grid; grid-template-columns: auto minmax(0, 15rem) 1fr auto; grid-template-areas: "mark vault . themes" "tools tools tools tools";
+  align-items: center; gap: .9rem 1.25rem; max-width: 1240px; margin: 0 auto; padding: var(--pad) var(--pad) 0; }
+.top:not(:has(.top__tools > :not([hidden]))) { grid-template-areas: "mark vault . themes"; }
+@media (min-width: 940px) {
+  .top { grid-template-columns: auto minmax(8rem, 15rem) 1fr auto auto; grid-template-areas: "mark vault . tools themes"; }
+  .top:not(:has(.top__tools > :not([hidden]))) { grid-template-areas: "mark vault . tools themes"; }
+  .top .top__tools { flex-wrap: nowrap; }
+}
+@media (max-width: 560px) {
+  .top { grid-template-columns: auto 1fr auto; grid-template-areas: "mark . themes" "vault vault vault" "tools tools tools"; }
+  .top:not(:has(.top__tools > :not([hidden]))) { grid-template-areas: "mark . themes" "vault vault vault"; }
+}
+.mark { grid-area: mark; } #vault { grid-area: vault; } .themes { grid-area: themes; }
 .mark { display: flex; align-items: center; gap: .7rem; font-weight: 700; font-size: 1.35rem; letter-spacing: -.01em; }
 .mark h1 { font-size: inherit; font-weight: var(--h-weight); }
 .mark__tile { width: 2.25rem; height: 2.25rem; background: var(--strong); border: var(--rule) solid var(--line); border-radius: var(--radius-ctl); box-shadow: var(--sh-3); display: grid; place-items: center; color: var(--on-strong); }
 [data-theme="dark"] .mark__tile, [data-theme="garden"] .mark__tile { border-color: var(--strong); }
 .mark__tile svg { width: 1.2rem; height: 1.2rem; }
-#vault { width: auto; min-height: 2.6rem; font-weight: 700; }
-/* everything right of the subject picker: right-aligned, so the theme swatches end at the same spot in every theme */
-.top__tools { display: flex; align-items: center; justify-content: flex-end; gap: 1rem 1.25rem; flex-wrap: wrap; margin-left: auto; }
+#vault { width: 100%; min-height: 2.6rem; font-weight: 700; }
+.top__tools { grid-area: tools; display: flex; align-items: center; gap: .75rem 1rem; flex-wrap: wrap; }
 .stats { display: flex; gap: .75rem; flex-wrap: wrap; }
 .stat { display: flex; align-items: baseline; gap: .45rem; padding: .4rem .85rem; border: var(--rule) solid var(--line); border-radius: var(--radius-ctl); box-shadow: var(--sh-3); background: var(--surface); font-weight: 600; }
 .stat b { font-family: var(--display); font-weight: var(--num-weight); font-size: 1.35rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .stat--streak { background: var(--warm); color: var(--warm-ink); } .stat--streak.is-zero { background: var(--surface); color: var(--ink); }
 [data-theme="dark"] .stat span { color: var(--muted); }
 [data-theme="dark"] .stat--streak:not(.is-zero) b { color: var(--accent); }
-/* pinned to the header's top-right corner: the same spot in every theme, whatever wraps */
-.themes { position: absolute; top: var(--pad); right: var(--pad); box-sizing: border-box; width: 8rem; height: 2.9rem; display: flex; align-items: center; justify-content: center; gap: .35rem; padding: .3rem; border: var(--rule) solid var(--line); border-radius: var(--radius-ctl); background: var(--surface); box-shadow: var(--sh-3); }
+.themes { box-sizing: border-box; width: 8rem; height: 2.9rem; display: flex; align-items: center; justify-content: center; gap: .35rem; padding: .3rem; border: var(--rule) solid var(--line); border-radius: var(--radius-ctl); background: var(--surface); box-shadow: var(--sh-3); }
 .themes button { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: var(--rule-thin) solid transparent; border-radius: calc(var(--radius-ctl) * .7); background: transparent; transition: border-color .15s, background-color .15s; }
 .themes button:hover { background: var(--accent-soft); }
 .themes button[aria-pressed="true"] { border-color: var(--ink); background: var(--accent-soft); }
@@ -240,7 +251,7 @@ h2 { font-size: 1.5rem; font-weight: var(--h-weight); letter-spacing: -.015em; l
 .sw--garden { background: #F3F6EF; border: 1px solid #C3D2BC; border-radius: 50%; }
 .sw--garden::before { content: ""; position: absolute; left: 50%; top: 48%; width: 9px; height: 13px; background: #7FA37A; border-radius: 0 100% 0 100%; transform: translate(-60%, -50%) rotate(-12deg); }
 .sw--garden::after { content: ""; position: absolute; right: 3px; top: 3px; width: 6px; height: 6px; border-radius: 50%; background: #F8DCE0; box-shadow: -1px 9px 0 -1px #FBEFC4; }
-.tabs-wrap { max-width: 1240px; margin: 0 auto; padding: var(--gap) var(--pad) 0; }
+.tabs-wrap { max-width: 1240px; margin: 0 auto; padding: var(--gap) var(--pad) 0; display: flex; align-items: center; justify-content: space-between; gap: .75rem 1.25rem; flex-wrap: wrap; }
 .tabs { display: inline-flex; border: var(--rule) solid var(--line); border-radius: var(--radius-ctl); box-shadow: var(--sh-4); background: var(--surface); overflow: hidden; }
 .tabs button { border: 0; background: transparent; padding: .55rem 1.1rem; min-height: 2.9rem; font-weight: 700; color: var(--ink); }
 .tabs button + button { border-left: var(--rule) solid var(--line); }
@@ -583,22 +594,23 @@ a.link-btn { font-size: .92rem; }
   <label class="sr-only" for="vault">Subject</label>
   <select id="vault" class="field"></select>
   <div class="top__tools">
-  <div class="stats">
-    <p class="stat"><b id="today-count">0</b><span id="today-label">/ 12 questions today</span></p>
-    <p class="stat stat--streak is-zero" id="streak-badge"><b id="streak-count">0</b><span>day streak</span></p>
-  </div>
-  <button type="button" class="btn btn--sm btn--mint" id="update-btn" hidden>Update Studyloop</button>
+  <button type="button" class="btn btn--sm btn--mint" id="update-btn" hidden>Update</button>
   <label class="modelpick" id="modelpick" hidden><span>Claude</span><select id="model" class="field" aria-label="Claude model for checks and questions"></select></label>
+  </div>
   <div class="themes" role="group" aria-label="Theme">
     <button type="button" data-theme-pick="tide" title="Tide" aria-pressed="false"><span class="sw sw--tide" aria-hidden="true"></span><span class="sr-only">Tide</span></button>
     <button type="button" data-theme-pick="dark" title="Dark Lab" aria-pressed="false"><span class="sw sw--dark" aria-hidden="true"></span><span class="sr-only">Dark Lab</span></button>
     <button type="button" data-theme-pick="garden" title="Soft Garden" aria-pressed="false"><span class="sw sw--garden" aria-hidden="true"></span><span class="sr-only">Soft Garden</span></button>
   </div>
-  </div>
 </header>
 <div class="tabs-wrap"><nav class="tabs" aria-label="Sections">
   <button type="button" data-view="quiz" aria-current="page">Quiz</button><button type="button" data-view="notes">Notes</button><button type="button" data-view="progress">Progress</button><button type="button" data-view="bank">Question bank</button>
-</nav></div>
+</nav>
+  <div class="stats">
+    <p class="stat"><b id="today-count">0</b><span id="today-label">/ 12 questions today</span></p>
+    <p class="stat stat--streak is-zero" id="streak-badge"><b id="streak-count">0</b><span>day streak</span></p>
+  </div>
+</div>
 <main id="app"></main>
 <dialog class="drawer" id="drawer" aria-label="Note">
   <div class="drawer__bar"><button class="icon-btn" id="dr-back" aria-label="Back to the previous note" hidden><svg aria-hidden="true"><use href="#i-back"/></svg></button>
@@ -1706,7 +1718,7 @@ async function checkUpdate() {
     if (!confirm(`Update Studyloop (${n})? The page reloads when it's done; nothing in your vaults changes.`)) return;
     b.disabled = true; b.textContent = "Updating…";
     try { await api("/api/update", { method: "POST", body: "{}" }); }
-    catch (e) { b.disabled = false; b.textContent = "Update Studyloop"; return alert(e.message); }
+    catch (e) { b.disabled = false; b.textContent = "Update"; return alert(e.message); }
     b.textContent = "Restarting…";
     for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 500));
