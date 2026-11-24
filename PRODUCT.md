@@ -1,49 +1,34 @@
 # Product
 
-<!-- impeccable:product-schema 1 -->
-
 ## Platform
 
-web
-
-## Stack
-
-Static: one self-contained HTML file (fonts inlined), no build step, opens from disk. State persists in `localStorage`. Confirmed by the user 2026-11-24.
+Local web app: `server.py` (Python standard library) serves `index.html` plus fonts, and reads and writes StudyVault folders on disk. Binds to 127.0.0.1 only. highlight.js comes from cdnjs; without a network, code keeps its indentation, just without colours.
 
 ## Users
 
-High schoolers cramming for exams: short, intense study blocks at a desk or on a phone, often late, switching between several subjects in one evening.
+A university student cramming for exams with Claude's `/tutor` skill, usually at a desk, sometimes on a phone, often several subjects in one evening.
 
 ## Product Purpose
 
-A Pomodoro timer joined to a per-subject task checklist and a weekly streak record. Success: the student starts a focus block in one keystroke, knows what they are working on, ticks it off, and sees their consistency build across the week.
+Answer exam-style questions with real, correctly indented code, and see progress build up in the same StudyVault that Claude tutors from. Success: a round takes one click to start, the result lands in the vault right away, and weak concepts are obvious at a glance.
 
-## Positioning
+## Capabilities
 
-Timer, task list and streak in one screen, sized for cramming: the timer is the hero, tasks feed the timer ("focus on this"), and finished focus blocks are what fill the streak grid.
+- Quiz: Claude-written rounds and bank practice rounds (open concepts weighted 4×, unseen questions preferred).
+- Automatic tracking for bank rounds: concept rows, error notes and the Learning Dashboard update on submit.
+- Progress: per-area rate, open concepts with error notes, a daily streak of questions answered.
+- To-do list per vault.
+- Question bank editor with a live preview.
 
-## Capabilities and Constraints
-
-- Focus / short break / long break modes (25 / 5 / 15 min by default), long break after every 4th focus block.
-- Subject checklist: add, tick off, delete; a task can be set as the current focus.
-- Weekly streak grid: completed focus blocks per day over recent weeks, current day streak.
-- No accounts, no sync, no network calls. Data lives in this browser only.
+The Pomodoro timer from the first version was removed (2026-11-24): nobody used it.
 
 ## Brand Commitments
 
-User-pinned visual brief (binding): neo-brutalist, 3px borders and hard 6px offset shadows in navy ink #14213D, misty base #EEF4F2, soft mint #9ED8CF for active states and completed tasks, ocean teal #2E6F87 as hero color, apricot #F2A97E only for streaks and celebrations. No pure black or white. Archivo Black for the timer, Space Grotesk for UI. Loud and fun but calm enough to focus with.
+Neo-brutalist, see `DESIGN.md`: 3px navy-ink rules, hard offset shadows, misty base, mint for active and correct, ocean teal for hero blocks, apricot only for streaks and celebrations. Archivo Black for numbers only, Space Grotesk for everything else.
 
-## Evidence on Hand
+## Principles
 
-None. Starter tasks are examples the student replaces; streak history starts empty and is never faked.
-
-## Product Principles
-
-1. One keystroke to start focusing.
-2. The timer never competes with itself: motion and colour stay still while a block runs.
-3. Celebrate real progress only.
+1. One click from opening the page to answering a question.
+2. Code is shown exactly as written: indentation is content.
+3. Celebrate real progress only; streak history is never faked.
 4. Everything works from the keyboard and reads at AA contrast.
-
-## Accessibility & Inclusion
-
-WCAG 2.2 AA contrast, full keyboard operation with visible focus, screen-reader labels for timer state and streak cells, `prefers-reduced-motion` respected.
