@@ -1,0 +1,11 @@
+{
+  "name": "claude-study-tool",
+  "owner": {"name": "CodingBear123"},
+  "plugins": [
+    {
+      "name": "claude-study-tool",
+      "source": "./",
+      "description": "/study and /study-vault: StudyVault notes, browser quizzes and concept tracking."
+    }
+  ]
+}

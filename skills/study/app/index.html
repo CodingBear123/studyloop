@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Crunch Time</title>
+<title>Claude Study Tool</title>
 <meta name="theme-color" content="#2E6F87">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='5' width='24' height='24' fill='%2314213D'/%3E%3Crect x='2' y='2' width='24' height='24' fill='%232E6F87' stroke='%2314213D' stroke-width='3'/%3E%3Cpath d='M8 15l4 4 8-9' stroke='%23EEF4F2' stroke-width='3' fill='none' stroke-linecap='square'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
@@ -231,7 +231,7 @@ pre code, pre code.hljs { display: block; padding: .85rem 1rem; background: tran
 </svg>
 
 <header class="top">
-  <div class="mark"><span class="mark__tile" aria-hidden="true"><svg><use href="#i-check"/></svg></span><h1>Crunch Time</h1></div>
+  <div class="mark"><span class="mark__tile" aria-hidden="true"><svg><use href="#i-check"/></svg></span><h1>Claude Study Tool</h1></div>
   <label class="sr-only" for="vault">Subject</label>
   <select id="vault" class="field"></select>
   <div class="stats">
@@ -507,7 +507,7 @@ function buildResults() {
 }
 function pasteString() {
   const parts = submitted.answers.map(a => a.type === "single" ? `${a.n}=${a.choice_letter || "-"}` : `${a.n}=${JSON.stringify(a.text)}`);
-  return `TUTOR round=${round.id} | ${parts.join(" | ")}`;
+  return `STUDY round=${round.id} | ${parts.join(" | ")}`;
 }
 async function submit() {
   const missing = answers.findIndex(a => a.choice === undefined && !(a.text || "").trim());
@@ -529,8 +529,12 @@ function resultsHTML() {
   else if (round.source === "claude") note = `<p>Go back to Claude and say <strong>done</strong>. Claude grades it and updates your StudyVault.</p>
       <details style="margin-top:.6rem"><summary class="small" style="cursor:pointer;font-weight:700">Answer string, if Claude can't read the file</summary><div class="paste">${esc(pasteString())}</div>
       <button class="btn btn--sm" id="copy" style="margin-top:.6rem">Copy</button></details>`;
-  else note = submitted.tracked ? `<p>Saved to your StudyVault: ${submitted.trackedCount} concept${submitted.trackedCount === 1 ? "" : "s"} updated and the Learning Dashboard recomputed.</p>`
+  else {
+    const n = submitted.trackedCount || 0;
+    note = n ? `<p>Saved to your StudyVault: ${n} answer${n === 1 ? "" : "s"} recorded and the Learning Dashboard recomputed.</p>`
       : `<p>Saved. These questions have no concept tag, so nothing changed in the concept files.</p>`;
+    if (!submitted.tracked) note += `<p>Your open answers still need grading: tell Claude <strong>grade my practice round</strong>.</p>`;
+  }
   return `<section class="block ${perfect ? "celebrate" : "hero"}" style="margin-bottom:calc(var(--gap) + 4px)"><div class="row" style="align-items:flex-end">
     ${scoreLine}<div class="grow"><p class="meta">${perfect ? "Clean sweep." : graded.length ? "single-choice correct" : "answers submitted"}</p>${note}</div></div></section>`;
 }
@@ -710,7 +714,7 @@ function setURL(extra) { history.replaceState(null, "", "?" + new URLSearchParam
 (async () => {
   const p = new URLSearchParams(location.search);
   const vaults = await api("/api/vaults");
-  let saved = null; try { saved = localStorage.getItem("tutor-vault"); } catch (_) {}
+  let saved = null; try { saved = localStorage.getItem("study-vault"); } catch (_) {}
   const ids = vaults.map(v => v.id);
   vault = [p.get("vault"), saved].find(v => v && ids.includes(v)) || ids[0];
   const sel = $("#vault");
@@ -719,7 +723,7 @@ function setURL(extra) { history.replaceState(null, "", "?" + new URLSearchParam
   const loadNames = async () => { try { areaNames = Object.fromEntries((await api("/api/areas")).map(a => [a.slug, a.title])); } catch (_) {} };
   sel.onchange = async () => {
     if (round && !submitted && !confirm("Leave this round?")) { sel.value = vault; return; }
-    vault = sel.value; try { localStorage.setItem("tutor-vault", vault); } catch (_) {}
+    vault = sel.value; try { localStorage.setItem("study-vault", vault); } catch (_) {}
     round = null; bankState = { areas: [], slug: null, bank: null, editing: null };
     await Promise.all([loadNames(), loadProgress()]); setView(view);
   };

@@ -1,0 +1,16 @@
+{
+  "name": "claude-study-tool",
+  "version": "1.0.0",
+  "description": "Turn course material into an Obsidian StudyVault (/study-vault) and get quizzed on it in a local browser page with concept-level progress tracking (/study).",
+  "author": {
+    "name": "CodingBear123"
+  },
+  "repository": "https://github.com/CodingBear123/claude-study-tool",
+  "keywords": [
+    "study",
+    "quiz",
+    "obsidian",
+    "flashcards",
+    "exam"
+  ]
+}

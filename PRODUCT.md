@@ -2,15 +2,15 @@
 
 ## Platform
 
-Local web app: `server.py` (Python standard library) serves `index.html` plus fonts, and reads and writes StudyVault folders on disk. Binds to 127.0.0.1 only. highlight.js comes from cdnjs; without a network, code keeps its indentation, just without colours.
+Claude Study Tool: two agent skills (`/study`, `/study-vault`) plus a local web app. `skills/study/app/server.py` (Python standard library) serves `index.html` plus fonts; every read and write of vault data goes through `studyvault.py`. Binds to 127.0.0.1 only. highlight.js comes from cdnjs; without a network, code keeps its indentation, just without colours.
 
 ## Users
 
-A university student cramming for exams with Claude's `/tutor` skill, usually at a desk, sometimes on a phone, often several subjects in one evening.
+A university student cramming for exams with the `/study` skill, usually at a desk, sometimes on a phone, often several subjects in one evening.
 
 ## Product Purpose
 
-Answer exam-style questions with real, correctly indented code, and see progress build up in the same StudyVault that Claude tutors from. Success: a round takes one click to start, the result lands in the vault right away, and weak concepts are obvious at a glance.
+Answer exam-style questions with real, correctly indented code, and see progress build up in the same StudyVault that `/study` quizzes from. Success: a round takes one click to start, the result lands in the vault right away, and weak concepts are obvious at a glance.
 
 ## Capabilities
 

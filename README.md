@@ -1,30 +1,86 @@
-# Crunch Time
+# Claude Study Tool
 
-Local quiz and progress app for `/tutor` StudyVaults. One server covers every `StudyVault` under `obsidian_local`.
+Two agent skills and a local quiz page for studying from an Obsidian **StudyVault**.
+
+| Command | What it does |
+|---|---|
+| `/study-vault` | Builds a StudyVault from your course material (slides, PDFs, old exams): notes per area, exam blueprint, practice files, a seeded question bank, empty trackers. Also updates a vault with new material, migrates an older `/tutor-setup` vault, and checks a vault for broken data. |
+| `/study` | Quizzes you from the vault: diagnostic, drill weak areas, one area, exam simulation, or a timed study plan. Rounds open in the local page (code keeps its indentation), Claude grades them and records the result. Also answers "how am I doing". |
+
+Both write vault data only through `skills/study/app/studyvault.py`, so the trackers, dashboard and question
+bank never drift apart. `studyvault.py check` proves it.
+
+## Install
+
+Any agent that reads Agent Skills (Claude Code, Codex, Cursor, Gemini CLI, Copilot, OpenCode, …):
 
 ```bash
-python3 ~/Documents/obsidian_notes/obsidian_local/_tutor-quiz/server.py
+npx skills add CodingBear123/claude-study-tool
 ```
 
-Then open http://127.0.0.1:8765/ and pick a subject at the top (the picker only shows up when there is more than one vault).
+Install both skills: `/study-vault` uses the tool and format that ship inside `study`.
 
-- **Quiz**: take the round `/tutor` wrote (`?round=current`), or a 4-question practice round from the bank. The **To do** list sits next to it (saved in `StudyVault/tasks.json`).
-- **Progress**: rate per area and the open (🔴) concepts with their error notes, both read from `concepts/*.md`, plus a streak grid of questions answered per day.
-- **Question bank**: add or edit questions per area, stored in `question-bank/{area}.json`.
+Claude Code plugin instead (commands then show up as `/claude-study-tool:study`):
 
-## How tracking works
+```bash
+claude plugin marketplace add CodingBear123/claude-study-tool
+claude plugin install claude-study-tool@claude-study-tool
+```
 
-| Round | Who grades | Who updates `concepts/*.md` and `Learning Dashboard.md` |
+From a clone, for development (edits go live):
+
+```bash
+ln -s "$PWD/skills/study" ~/.claude/skills/study
+ln -s "$PWD/skills/study-vault" ~/.claude/skills/study-vault
+```
+
+Needs Python 3.9+ (standard library only) and, for PDFs, `pdftotext` (poppler).
+
+## The page
+
+`/study` starts it for you. By hand:
+
+```bash
+python3 skills/study/app/server.py --root ~/path/to/notes
+```
+
+Open http://127.0.0.1:8765/. Tabs: **Quiz** (Claude's round, practice rounds from the bank, To do list),
+**Progress** (rate per area, open concepts with error notes, daily streak), **Question bank** (editor).
+
+| Round | Graded by | Recorded by |
 |---|---|---|
-| Practice round from the bank | the page (the answer key is in the bank) | **the server**, on submit (`results/*.json` gets `"tracked": true`) |
-| Round written by Claude | Claude, after you say "done" | Claude (`/tutor` Phase 6) |
+| Written by Claude | Claude, after you say "done" | `studyvault.py record` |
+| Practice round from the bank | the page | the server, on submit; open answers are left for Claude |
 
-Open-answer questions are never auto-graded; Claude grades them.
+## The vault
 
-Rebuild a dashboard by hand (e.g. after Claude edits concept files):
-
-```bash
-python3 ~/Documents/obsidian_notes/obsidian_local/_tutor-quiz/server.py --recompute ~/Documents/obsidian_notes/obsidian_local/HS26/SoCo/StudyVault
+```
+StudyVault/
+  studyvault.json        areas (slug, title, folder), subject, scope, exam
+  Learning Dashboard.md  generated from concepts/
+  00-Dashboard/          MOC, Exam Blueprint, Quick Reference, Exam Traps
+  01-…/ 02-…/            notes + one practice file per area
+  concepts/<slug>.md     concept tracker per area
+  question-bank/<slug>.json, rounds/, results/
+  tasks.json             study plan / to-do list
 ```
 
-Restart the server after creating a new StudyVault. Full data format: `~/.claude/skills/tutor/references/quiz-frontend.md`. Visual system: `DESIGN.md`.
+Full format: [skills/study/references/studyvault-spec.md](skills/study/references/studyvault-spec.md).
+
+```bash
+python3 skills/study/app/studyvault.py check   path/to/StudyVault   # validate everything
+python3 skills/study/app/studyvault.py status  path/to/StudyVault   # summary JSON
+python3 skills/study/app/studyvault.py migrate path/to/StudyVault --write   # older /tutor vault
+```
+
+## Tests
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+## Credits
+
+The study workflow started from the `tutor` and `tutor-setup` skills in
+[RoundTable02/tutor-skills](https://github.com/RoundTable02/tutor-skills).
+Design notes: [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).

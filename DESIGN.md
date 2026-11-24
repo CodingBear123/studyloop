@@ -1,5 +1,5 @@
 ---
-name: Crunch Time
+name: Claude Study Tool
 description: A neo-brutalist study desk of chunky printed blocks for quizzing and tracking progress.
 colors:
   navy-ink: "#14213D"
@@ -13,7 +13,7 @@ colors:
   slate-muted: "#4A5A72"
 ---
 
-# Crunch Time: design notes
+# Claude Study Tool: design notes
 
 Carried over from the first (timer) version; the timer slab is gone, everything else keeps the same construction.
 
