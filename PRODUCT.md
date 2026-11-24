@@ -19,6 +19,8 @@ Answer exam-style questions with real, correctly indented code, and see progress
 - Progress: per-area rate, open concepts with error notes, a daily streak of questions answered.
 - To-do list per vault.
 - Question bank editor with a live preview.
+- Open answers in practice rounds: self-graded against the model answer, or checked by a one-off headless `claude -p` call.
+- Three themes (Tide, Dark Lab, Soft Garden), switched from the header and remembered in localStorage.
 
 The Pomodoro timer from the first version was removed (2026-11-24): nobody used it.
 

@@ -45,12 +45,20 @@ python3 skills/study/app/server.py --root ~/path/to/notes
 ```
 
 Open http://127.0.0.1:8765/. Tabs: **Quiz** (Claude's round, practice rounds from the bank, To do list),
-**Progress** (rate per area, open concepts with error notes, daily streak), **Question bank** (editor).
+**Notes** (the vault's notes, readable on the page), **Progress** (rate per area, open concepts with error
+notes, daily streak), **Question bank** (editor).
+
+After grading, each question links to the note section that covers it, and **Ask Claude** answers follow-up
+questions about it (also at the end of every note). Checks and questions are one-off `claude -p` calls
+with no tools; the **Claude** picker in the header chooses Sonnet, Opus or Haiku.
 
 | Round | Graded by | Recorded by |
 |---|---|---|
 | Written by Claude | Claude, after you say "done" | `studyvault.py record` |
-| Practice round from the bank | the page | the server, on submit; open answers are left for Claude |
+| Practice round from the bank | the page; open answers by you (against the model answer) or by "Check with Claude" | the server |
+
+Themes: Tide (default), Dark Lab and Soft Garden, switched from the swatches in the header and remembered
+in the browser. Dark Lab and Soft Garden load their fonts from Google Fonts.
 
 ## The vault
 

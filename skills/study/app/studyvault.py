@@ -726,6 +726,10 @@ class Vault:
                 E += [f"{tag}: {e}" for e in validate_question(q, f"question {i}", need_answer=True)]
                 if not clean_cell(q.get("concept") or ""):
                     W.append(f"{tag}: {q.get('id')} has no concept, so bank rounds can't track it")
+                if q.get("ref"):
+                    import notes  # noqa: PLC0415 (only needed for this check)
+                    if not notes.Notes(self).resolve_ref(q["ref"]):
+                        W.append(f"{tag}: {q.get('id')} ref {q['ref']!r} names no note")
         for s in known:
             if not (self.bank_dir / f"{s}.json").exists():
                 W.append(f"question-bank/{s}.json missing (empty bank)")

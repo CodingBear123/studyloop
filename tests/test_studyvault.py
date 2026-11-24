@@ -205,6 +205,79 @@ class ServerTests(unittest.TestCase):
         self.assertIn("because", notes["late binding"])
         self.assertEqual(self.app.v.check()[0], [])
 
+    def test_open_answer_self_and_claude_grading(self):
+        self.app.v.put_bank("closures", {"questions": [
+            {"id": "c-2", "type": "open", "concept": "cell objects", "prompt": "What is a cell?",
+             "model_answer": "a box shared by closure and outer scope", "explanation": "cells hold free variables"}]})
+        rid = "bank-20261124-000001"
+        self.app.save_results({"round_id": rid, "source": "bank", "answers": [
+            {"n": 1, "id": "c-2", "area": "closures", "concept": "cell objects", "type": "open", "text": "no idea", "correct": None}]})
+        self.assertFalse(sv.load_json(self.app.v.bank_dir / "results" / f"{rid}.json")["tracked"])
+        r = self.app.grade_open({"round_id": rid, "n": 1, "mode": "self", "correct": False})
+        self.assertEqual((r["correct"], r["tracked"]), (False, True))
+        rows, notes = self.app.v.concepts("closures")
+        self.assertEqual((rows[0]["name"], rows[0]["status"]), ("cell objects", "🔴"))
+        self.assertIn("no idea", notes["cell objects"])
+        latest = sv.load_json(self.app.v.bank_dir / "results" / "latest.json")
+        self.assertTrue(latest["answers"][0]["recorded"] and latest["tracked"])
+        with self.assertRaises(ValueError):  # no double counting
+            self.app.grade_open({"round_id": rid, "n": 1, "mode": "self", "correct": True})
+        self.assertEqual(self.app.v.check()[0], [])
+        # Claude mode, with the CLI call stubbed
+        rid2 = "bank-20261124-000002"
+        self.app.save_results({"round_id": rid2, "source": "bank", "answers": [
+            {"n": 1, "id": "c-2", "area": "closures", "concept": "cell objects", "type": "open", "text": "a shared box"}]})
+        real = server.ask_claude
+        server.ask_claude = lambda *a, **k: {"correct": True, "feedback": "Yes.", "confusion": "", "key_point": ""}
+        try:
+            r = self.app.grade_open({"round_id": rid2, "n": 1, "mode": "claude"})
+        finally:
+            server.ask_claude = real
+        self.assertEqual((r["correct"], r["feedback"]), (True, "Yes."))
+        self.assertEqual(self.app.v.concepts("closures")[0][0]["status"], "🟢")
+
+    def test_notes_tree_read_and_question_refs(self):
+        folder = self.app.v.path / "01-Closures"
+        (folder / "Cells.md").write_text(
+            "---\nsource: S04\n---\n# Cells\nintro\n## Late binding of loop variables\n"
+            "Closures capture the variable, not the value, so late binding gives the last loop value.\n"
+            "```python\n# not a heading\n```\n## Other\nunrelated text about bytes\n")
+        tree = self.app.notes.tree()
+        self.assertEqual(tree[0]["title"], "Closures")
+        self.assertEqual(tree[0]["notes"][-1]["practice"], True)  # practice files last
+        note = self.app.notes.read("01-Closures/Cells.md")
+        self.assertEqual(note["meta"], {"source": "S04"})
+        self.assertTrue(note["body"].startswith("# Cells"))
+        for bad in ("../x.md", "concepts/../../../etc/passwd", ".migrated/x.md", "studyvault.json"):
+            with self.assertRaises(ValueError):
+                self.app.notes.read(bad)
+        q = self.app.sample_round(["closures"], 1, None)["questions"][0]  # concept "late binding"
+        self.assertEqual((q["note"]["path"], q["note"]["anchor"]), ("01-Closures/Cells.md", "late-binding-of-loop-variables"))
+        self.assertEqual(self.app.notes.section_text(q["note"]["path"], q["note"]["anchor"])[1].count("not a heading"), 1)
+        self.assertNotIn("bytes", self.app.notes.section_text(q["note"]["path"], q["note"]["anchor"])[1])
+        explicit = self.app.notes.note_for({"ref": "Cells#Other", "concept": "late binding"})
+        self.assertEqual((explicit["anchor"], explicit["auto"]), ("other", False))
+        self.app.v.put_bank("closures", {"questions": [dict(self.app.v.bank_question("closures", "c-1"), ref="Nope#x")]})
+        self.assertTrue(any("names no note" in w for w in self.app.v.check()[1]))
+
+    def test_ask_passes_question_and_note(self):
+        (self.app.v.path / "01-Closures" / "Cells.md").write_text("# Cells\n## Boxes\ncells are boxes\n")
+        seen = {}
+        real = server.run_claude
+        server.run_claude = lambda prompt, model=None, schema=None, timeout=0: seen.update(p=prompt, m=model) or "An answer."
+        try:
+            r = self.app.ask({"message": "why?", "model": "opus", "question": {"area": "closures", "id": "c-1"},
+                              "student": "B", "note": {"path": "01-Closures/Cells.md", "anchor": "boxes"},
+                              "history": [{"role": "user", "text": "first"}, {"role": "claude", "text": "reply"}]})
+        finally:
+            server.run_claude = real
+        self.assertEqual(r, {"answer": "An answer.", "model": "opus"})
+        for part in ("because", "CORRECT OPTION: C", "cells are boxes", "Student: first", "Tutor: reply", "why?"):
+            self.assertIn(part, seen["p"])
+        self.assertEqual(server.pick_model("gpt"), server.CLAUDE_MODEL)
+        with self.assertRaises(ValueError):
+            self.app.ask({"message": "  "})
+
     def test_progress_shape(self):
         p = self.app.progress()
         self.assertEqual({"areas", "open", "activity", "total"}, set(p))

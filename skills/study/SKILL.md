@@ -66,7 +66,9 @@ tick them off. Stop when the user says pause; the tasks stay for next time.
 3. Write the rest yourself: 4 questions per round by default, `single` (4 options) and `open` mixed. For code
    subjects prefer output prediction and debugging with real, indented code in the `code` field.
 4. Every question gets `area` (a manifest slug) and `concept`. Reuse the exact concept name from the tracker
-   when testing an existing concept, so its row updates instead of a duplicate appearing.
+   when testing an existing concept, so its row updates instead of a duplicate appearing. Add
+   `"ref": "Note title#Heading"` for the section you wrote the question from; after grading the page links
+   to it (without `ref` it guesses).
 5. Save to `question-bank/rounds/current.json` **without `answer` fields** (keep the key in your context), then
    run `studyvault.py validate-round VAULT` and fix what it reports.
 
@@ -92,7 +94,8 @@ Format: `references/app.md`.
    code in fenced blocks and a `[[note]]` to reread.
 
 Practice rounds the user starts from the page (`source: "bank"`) are graded by the server: answers with
-`"recorded": true` are already tracked. Report them and only grade the open answers that are left.
+`"recorded": true` are already tracked (the user can grade open answers on the page, alone or with a
+one-off headless Claude check). Report them and only grade the open answers that are left.
 
 ## 6. Record
 

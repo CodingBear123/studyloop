@@ -12,8 +12,12 @@ folder that holds the StudyVault (e.g. "HS26/SoCo"). GET /api/vaults lists them.
 """
 import argparse
 import json
+import os
 import random
+import shutil
+import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,9 +25,122 @@ from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import notes as nt  # noqa: E402
 import studyvault as sv  # noqa: E402
 
 FONT_NAMES = {p.name for p in (HERE / "fonts").glob("*.woff2")}
+
+# Open answers on the page: graded by the user (self-check against the model answer) or by a
+# one-off headless Claude Code call (`claude -p`, no tools, no session saved). Nothing runs in
+# the background: each check is one short process.
+CLAUDE = os.environ.get("STUDY_CLAUDE") or shutil.which("claude")
+MODELS = ("sonnet", "opus", "haiku")
+CLAUDE_MODEL = os.environ.get("STUDY_CLAUDE_MODEL", "sonnet")
+GRADE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "correct": {"type": "boolean"},
+        "feedback": {"type": "string"},
+        "confusion": {"type": "string"},
+        "key_point": {"type": "string"},
+    },
+    "required": ["correct", "feedback", "confusion", "key_point"],
+}
+
+
+def pick_model(model):
+    return model if model in MODELS else CLAUDE_MODEL
+
+
+def run_claude(prompt, model=None, schema=None, timeout=120):
+    """One headless Claude Code call: no tools, no MCP servers, no saved session, empty working folder.
+
+    Returns structured_output (with a schema) or the answer text."""
+    if not CLAUDE:
+        raise ValueError("the claude command isn't on this server's PATH")
+    cmd = [CLAUDE, "-p", prompt, "--output-format", "json", "--model", pick_model(model), "--tools", "",
+           "--strict-mcp-config", "--no-session-persistence"]
+    if schema:
+        cmd += ["--json-schema", json.dumps(schema)]
+    with tempfile.TemporaryDirectory() as tmp:  # empty cwd: no project files or CLAUDE.md
+        try:
+            out = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise ValueError(f"Claude took longer than {timeout // 60} minutes; try again")
+    try:
+        res = json.loads(out.stdout)
+        if res.get("is_error"):
+            raise ValueError(res.get("result") or "error")
+        if schema:
+            return res.get("structured_output") or json.loads(res.get("result") or "{}")
+        return str(res["result"])
+    except (ValueError, KeyError, TypeError) as e:
+        msg = (out.stderr or "").strip().splitlines() or [str(e)]
+        raise ValueError("Claude call failed: " + msg[-1][:200])
+
+
+def lang_word(lang):
+    return "German" if lang == "de" else "English"
+
+
+def question_text(q):
+    """The question as plain text for a prompt: prompt, code, lettered options."""
+    parts = ["QUESTION:", str(q.get("prompt") or "")]
+    if q.get("code"):
+        parts += ["", "CODE:", str(q["code"])]
+    opts = q.get("options") or []
+    if isinstance(opts, list) and opts:
+        parts += ["", "OPTIONS:"] + [f"{'ABCDEFGH'[i]}) {o}" for i, o in enumerate(opts[:8])]
+        if isinstance(q.get("answer"), int) and 0 <= q["answer"] < len(opts):
+            parts += [f"CORRECT OPTION: {'ABCDEFGH'[q['answer']]}"]
+    return parts
+
+
+def ask_claude(q, text, subject, lang, model=None):
+    """Grade one open answer with headless Claude Code. Returns the GRADE_SCHEMA dict."""
+    parts = [
+        f"You grade one open exam answer for the course \"{subject}\".",
+        "Be an exam corrector: correct is true only if the core idea is right and nothing important is",
+        "wrong or missing compared with the model answer. Partly right counts as false.",
+        "Write feedback (1-3 sentences, to the student, say what was right and what was missing), confusion",
+        "(what they mixed up, one line, empty if correct) and key_point (the correct idea, one line) in",
+        lang_word(lang) + ".", ""] + question_text(q)
+    parts += ["", "MODEL ANSWER:", q.get("model_answer") or "(none)"]
+    if q.get("explanation"):
+        parts += ["", "EXPLANATION:", q["explanation"]]
+    parts += ["", "STUDENT ANSWER:", text.strip() or "(empty)"]
+    verdict = run_claude("\n".join(parts), model, GRADE_SCHEMA)
+    try:
+        verdict["correct"] = bool(verdict["correct"])
+    except (KeyError, TypeError):
+        raise ValueError("Claude check failed: no verdict in the answer")
+    return verdict
+
+
+def ask_tutor(subject, lang, message, history=(), question=None, student=None, note=None, model=None):
+    """Answer a free question from the student, with the question and the course notes as context."""
+    parts = [
+        f"You are a tutor for the university course \"{subject}\". The student is studying for the exam and",
+        "asks you something. Answer the question they asked, clearly and briefly (usually under 200 words),",
+        f"in {lang_word(lang)} unless they write in another language. Use Markdown; put code in fenced blocks",
+        "with indentation kept. Base the answer on the course notes below; if they don't cover it, say so and",
+        "answer from general knowledge. You have no tools and can't see any files besides what is below."]
+    if question:
+        parts += ["", "THE PRACTICE QUESTION THEY ARE LOOKING AT"] + question_text(question)
+        for k, label in (("model_answer", "MODEL ANSWER"), ("explanation", "EXPLANATION")):
+            if question.get(k):
+                parts += ["", label + ":", str(question[k])]
+        if student:
+            parts += ["", "WHAT THE STUDENT ANSWERED:", student]
+    if note:
+        parts += ["", f"COURSE NOTES ({note[0]}):", note[1]]
+    if history:
+        parts += ["", "CONVERSATION SO FAR:"]
+        for h in list(history)[-10:]:
+            who = "Student" if h.get("role") == "user" else "Tutor"
+            parts += [f"{who}: {str(h.get('text') or '')[:3000]}"]
+    parts += ["", "STUDENT'S QUESTION:", message.strip()]
+    return run_claude("\n".join(parts), model, timeout=240)
 
 
 class App:
@@ -31,6 +148,20 @@ class App:
 
     def __init__(self, path):
         self.v = sv.Vault(path)
+        self.notes = nt.Notes(self.v)
+
+    def folder(self, slug):
+        a = self.v.area(slug or "")
+        return a.get("folder") if a else None
+
+    def with_notes(self, qs):
+        """Attach the note section that covers each question ("note"; the page shows it after grading)."""
+        for q in qs:
+            try:
+                q["note"] = self.notes.note_for(q, self.folder(q.get("area")))
+            except (OSError, ValueError):
+                q["note"] = None
+        return qs
 
     @property
     def vault(self):
@@ -89,7 +220,8 @@ class App:
                 if isinstance(q.get("answer"), int):
                     q["answer"] = order.index(q["answer"])
         return {"id": datetime.now().strftime("bank-%Y%m%d-%H%M%S"), "source": "bank",
-                "title": ", ".join(self.v.title(s) for s in slugs), "reveal": True, "questions": picked}
+                "title": ", ".join(self.v.title(s) for s in slugs), "reveal": True,
+                "questions": self.with_notes(picked)}
 
     def get_round(self, rid):
         if not sv.ID_RE.match(rid):
@@ -106,6 +238,7 @@ class App:
                 bq = self.v.bank_question(ref.get("area", ""), ref.get("id", ""))
                 if bq:
                     q.update(dict(bq, area=ref["area"]))
+        self.with_notes(data.get("questions", []))
         return data
 
     def save_results(self, data):
@@ -146,6 +279,87 @@ class App:
                         if a.get("type") == "open" and (a.get("text") or "").strip())
         data["tracked"] = open_left == 0
         data["tracked_count"] = len(graded)
+
+    def grade_open(self, data):
+        """Grade one open answer of a saved bank round, record it, and update the results file.
+
+        data: {"round_id", "n", "mode": "self"|"claude", "correct": bool (self only)}"""
+        rid = data.get("round_id") or ""
+        if not sv.ID_RE.match(rid):
+            raise ValueError("bad round id")
+        res_dir = self.v.bank_dir / "results"
+        res = sv.load_json(res_dir / f"{rid}.json")
+        if not isinstance(res, dict):
+            raise ValueError("this round wasn't saved; submit it first")
+        a = next((x for x in res.get("answers", []) if x.get("n") == data.get("n") and x.get("type") == "open"), None)
+        if a is None:
+            raise ValueError("no open answer with that number")
+        if a.get("recorded"):
+            raise ValueError("already graded")
+        area = a.get("area") or ""
+        q = self.v.bank_question(area, a.get("id")) or {}
+        if not q.get("model_answer"):
+            raise ValueError("no model answer for this question; grade it in the chat with Claude")
+        text = a.get("text") or ""
+        mode = data.get("mode")
+        if mode == "claude":
+            verdict = ask_claude(q, text, self.v.manifest.get("subject", ""), self.v.lang, data.get("model"))
+        elif mode == "self":
+            verdict = {"correct": bool(data.get("correct")), "feedback": "", "confusion": "", "key_point": ""}
+        else:
+            raise ValueError("mode must be self or claude")
+        concept = (a.get("concept") or "").strip()
+        if concept and self.v.area(area):
+            wrote = text.strip().replace("\n", " ")[:120]
+            self.v.record([{
+                "area": area, "concept": concept, "correct": verdict["correct"],
+                "confusion": verdict.get("confusion") or (f"wrote `{wrote}` in a practice round." if wrote
+                                                          else "left it unanswered."),
+                "key_point": verdict.get("key_point") or sv.plain(q.get("explanation"))
+                or sv.plain(q.get("model_answer")),
+            }])
+        a.update(correct=verdict["correct"], recorded=True, graded_by=mode)
+        if verdict.get("feedback"):
+            a["feedback"] = verdict["feedback"]
+        res["tracked"] = not any(x.get("type") == "open" and (x.get("text") or "").strip() and not x.get("recorded")
+                                 for x in res.get("answers", []))
+        sv.write_json(res_dir / f"{rid}.json", res)
+        latest = sv.load_json(res_dir / "latest.json")
+        if isinstance(latest, dict) and latest.get("round_id") == rid:
+            sv.write_json(res_dir / "latest.json", res)
+        return {"correct": verdict["correct"], "feedback": verdict.get("feedback", ""), "tracked": res["tracked"],
+                "recorded": bool(concept)}
+
+    def ask(self, data):
+        """Free question to Claude about a question of a round, or about a note.
+
+        data: {"message", "history": [{"role": "user"|"claude", "text"}], "model",
+               "question": {area, id, prompt, code, options, model_answer, explanation} (optional),
+               "student": what they answered (optional), "note": {"path", "anchor"} (optional)}"""
+        message = str(data.get("message") or "").strip()
+        if not message:
+            raise ValueError("write a question first")
+        q = data.get("question") if isinstance(data.get("question"), dict) else None
+        if q:  # the page's copy wins (its options may be shuffled); the bank fills in what is missing
+            bq = self.v.bank_question(q.get("area") or "", q.get("id") or "") if q.get("id") else None
+            keep = ("prompt", "code", "options", "answer", "model_answer", "explanation")
+            given = {k: q[k] for k in keep if q.get(k) not in (None, "", [])}
+            if bq and "options" not in given and "prompt" not in given:
+                given = dict(bq)
+            elif bq:
+                for k in ("model_answer", "explanation"):
+                    if bq.get(k):
+                        given.setdefault(k, bq[k])
+            q = given
+        note = None
+        ref = data.get("note") if isinstance(data.get("note"), dict) else None
+        if ref and ref.get("path"):
+            note = self.notes.section_text(ref["path"], ref.get("anchor") or "")
+        history = [h for h in (data.get("history") or []) if isinstance(h, dict)]
+        student = str(data.get("student") or "")[:4000] or None
+        answer = ask_tutor(self.v.manifest.get("subject", ""), self.v.lang, message[:4000], history, q, student,
+                           note, data.get("model"))
+        return {"answer": answer, "model": pick_model(data.get("model"))}
 
     def progress(self):
         st = self.v.stats()
@@ -224,11 +438,25 @@ def make_handler(vaults):
                         return self.send(200, (HERE / "fonts" / name).read_bytes(), "font/woff2", cache=True)
                     return self.send(404, {"error": "not found"})
                 if method == "GET" and p == "/api/vaults":
-                    return self.send(200, [{"id": k, "path": str(a.vault), "subject": a.v.manifest.get("subject")}
-                                           for k, a in vaults.items()])
+                    return self.send(200, [{"id": k, "path": str(a.vault), "subject": a.v.manifest.get("subject"),
+                                            "claude_check": bool(CLAUDE), "models": list(MODELS),
+                                            "default_model": pick_model(CLAUDE_MODEL)} for k, a in vaults.items()])
                 app = pick(q) if p.startswith("/api/") else None
                 if method == "GET" and p == "/api/areas":
                     return self.send(200, app.areas())
+                if method == "GET" and p == "/api/notes":
+                    return self.send(200, app.notes.tree())
+                if method == "GET" and p == "/api/asset":
+                    f = app.notes.asset(q.get("path", [""])[0])
+                    return self.send(200, f.read_bytes(), nt.IMAGE_TYPES[f.suffix.lower()], cache=True)
+                if method == "GET" and p == "/api/note":
+                    return self.send(200, app.notes.read(q.get("path", [""])[0]))
+                if method == "POST" and p == "/api/note-ref":
+                    d = self.body()
+                    qd = d.get("question") if isinstance(d.get("question"), dict) else {}
+                    return self.send(200, {"note": app.notes.note_for(qd, app.folder(d.get("area")))})
+                if method == "POST" and p == "/api/ask":
+                    return self.send(200, app.ask(self.body()))
                 if method == "GET" and p == "/api/progress":
                     return self.send(200, app.progress())
                 if p == "/api/tasks":
@@ -259,6 +487,8 @@ def make_handler(vaults):
                     path = app.save_results(data)
                     return self.send(200, {"ok": True, "path": path, "tracked": data.get("tracked", False),
                                            "tracked_count": data.get("tracked_count", 0)})
+                if method == "POST" and p == "/api/grade-open":
+                    return self.send(200, app.grade_open(self.body()))
                 return self.send(404, {"error": "not found"})
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
