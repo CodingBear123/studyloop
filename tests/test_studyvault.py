@@ -374,6 +374,19 @@ class ServerTests(unittest.TestCase):
             finally:
                 server.PREFS_FILE = real
 
+    def test_language_comes_from_the_notes(self):
+        with tempfile.TemporaryDirectory() as d:
+            v = Path(d) / "StudyVault"
+            (v / "01-Basics").mkdir(parents=True)
+            sv.write_json(v / "studyvault.json", {"subject": "X", "language": "en", "areas": []})
+            self.assertEqual(sv.Vault(v).lang, "en")  # no notes yet: the manifest decides
+            (v / "01-Basics" / "Grundlagen.md").write_text(
+                "Die Bank ist ein Unternehmen, das Kredite vergibt und Einlagen von den Kunden annimmt. " * 10, encoding="utf-8")
+            self.assertEqual(sv.detect_language(v), "de")
+            self.assertEqual(sv.Vault(v).lang, "de")
+            (v / "01-Basics" / "Grundlagen.md").write_text("The bank is a firm that lends and takes deposits from the public. " * 10)
+            self.assertEqual(sv.Vault(v).lang, "en")
+
     def test_old_themes_become_light(self):
         self.assertEqual(server.clean_prefs({"theme": "tide"}), {"theme": "light"})
         self.assertEqual(server.clean_prefs({"theme": "garden"}), {"theme": "light"})

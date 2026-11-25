@@ -77,7 +77,9 @@ the manifest and creates the missing tracker and bank files). Never rename a slu
 
 ## Language
 
-`language` in the manifest (`en` or `de`) sets the structure words: tracker title, table header, error-notes
+The vault's language is read from its notes (German or English, by counting common words); when the notes
+are too short to tell, `language` in the manifest (`en` or `de`) decides. It sets the study page's text, the
+language Claude grades in, and the structure words: tracker title, table header, error-notes
 heading and bullet labels, and the dashboard's headings and levels. German trackers use
 `| Konzept | Versuche | Richtig | Zuletzt getestet | Status |`, `### Fehlernotizen`, `- Verwechslung:` and
 `- Kernpunkt:`. Parsing accepts both languages. Other languages fall back to English structure words.

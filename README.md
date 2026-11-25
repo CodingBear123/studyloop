@@ -221,6 +221,10 @@ ask Claude.
 | **Progress** | overall rate, rate per area, open concepts with what you mixed up, a daily streak |
 | **Question bank** | add, edit and delete bank questions per area |
 
+The page speaks the language of the subject you have open: a vault whose notes are in German gets German
+buttons and labels, and Claude grades and answers in German there. It is read from the notes, so there is
+nothing to set.
+
 **Who grades what**
 
 | Round | Graded by | Recorded by |

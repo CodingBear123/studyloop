@@ -73,6 +73,32 @@ NOTES_HEADS = tuple(L["notes"] for L in LABELS.values())
 PLACEHOLDERS = tuple(L["placeholder"] for L in LABELS.values())
 
 
+# Telling German from English notes: count a few very common words of each.
+STOP_WORDS = {
+    "de": set("der die das und ist nicht ein eine einer zu mit von den dem für auf sich auch werden wird bei oder "
+              "wenn als wie im sind kann durch nach aus über".split()),
+    "en": set("the and is of to in that it for are with as be this by on not or an from which can when if was".split()),
+}
+
+
+def detect_language(folder, enough=400):
+    """'de' or 'en' from the words in a folder's notes; None when there is too little text to tell."""
+    hits = {k: 0 for k in STOP_WORDS}
+    for p in sorted(Path(folder).rglob("*.md")):
+        try:
+            words = re.findall(r"[a-zäöüß]+", p.read_text(encoding="utf-8", errors="ignore").lower())
+        except OSError:
+            continue
+        for w in words:
+            for k, ws in STOP_WORDS.items():
+                hits[k] += w in ws
+        if sum(hits.values()) >= enough:
+            break
+    best = max(hits, key=hits.get)
+    rest = sum(hits.values()) - hits[best]
+    return best if hits[best] >= 30 and hits[best] >= 2 * rest else None
+
+
 def labels(lang):
     return LABELS.get((lang or "en")[:2], LABELS["en"])
 
@@ -380,6 +406,7 @@ class Vault:
         self.dashboard = self.path / DASHBOARD
         self.manifest_path = self.path / MANIFEST
         self._manifest = None
+        self._lang = None
 
     # ----- manifest -----
 
@@ -395,6 +422,7 @@ class Vault:
 
     def reload(self):
         self._manifest = None
+        self._lang = None
 
     def areas(self):
         return [a for a in self.manifest.get("areas", []) if isinstance(a, dict) and a.get("slug")]
@@ -408,7 +436,10 @@ class Vault:
 
     @property
     def lang(self):
-        return (self.manifest.get("language") or "en")[:2]
+        """The notes' language when they make it clear, else the manifest's "language", else English."""
+        if self._lang is None:
+            self._lang = detect_language(self.path) or (self.manifest.get("language") or "en")[:2]
+        return self._lang
 
     def old_dashboards(self):
         """Dashboards an older vault may have, other than the generated one."""
@@ -662,7 +693,7 @@ class Vault:
         untracked = [r.get("round_id") for r in self.results() if not r.get("tracked")]
         latest = load_json(self.bank_dir / "results" / "latest.json")
         m = self.manifest
-        return {"vault": str(self.path), "subject": m.get("subject"), "language": m.get("language"),
+        return {"vault": str(self.path), "subject": m.get("subject"), "language": self.lang,
                 "exam": m.get("exam"), "scope": m.get("scope"), "manifest": self.has_manifest(), **st,
                 "untracked_results": untracked,
                 "latest_result": {k: latest.get(k) for k in ("round_id", "source", "submitted_at", "tracked")}

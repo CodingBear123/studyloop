@@ -607,7 +607,7 @@ def make_handler(vaults):
                     name, ctype = APP_FILES[p]
                     return self.send(200, (HERE / name).read_bytes(), ctype)
                 if method == "GET" and p == "/api/vaults":
-                    return self.send(200, [{"id": k, "path": str(a.vault), "subject": a.v.manifest.get("subject"),
+                    return self.send(200, [{"id": k, "path": str(a.vault), "subject": a.v.manifest.get("subject"), "language": a.v.lang,
                                             "claude_check": bool(CLAUDE), "models": list(MODELS),
                                             "default_model": pick_model(CLAUDE_MODEL)} for k, a in vaults.items()])
                 if p == "/api/update":

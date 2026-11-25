@@ -596,7 +596,7 @@ function grade(q, a = {}) {
   }
 }
 const keyText = q => q.type === "single" ? LET[q.answer] : q.type === "multi" ? q.answer.map(j => LET[j]).join(", ")
-  : q.type === "kprim" ? q.answer.map((x, j) => `${j + 1} ${x ? "true" : "false"}`).join(", ")
+  : q.type === "kprim" ? q.answer.map((x, j) => `${j + 1} ${tr(x ? "true" : "false")}`).join(", ")
   : q.type === "numeric" ? fmtNum(q.answer) + (q.tolerance ? ` ± ${fmtNum(q.tolerance)}` : "") + (q.unit ? " " + q.unit : "") : "";
 const hasKey = q => q.type === "single" ? Number.isInteger(q.answer) : q.type === "numeric" ? typeof q.answer === "number" : Array.isArray(q.answer);
 const GOAL = 12;  // questions per day for a full streak cell
@@ -606,6 +606,146 @@ function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.ad
 let vault = "";
 let claudeCheck = false;
 const say = plain => plain;
+// ---- page language: follows the open vault (the server reads it from the notes) ----
+// The page is written in English; tr() gives the German text, and a watcher translates text and labels as they appear.
+// Note and question content is never touched.
+let LANG = "en";
+const DE = {
+  "Subject": "Fach", "Update": "Aktualisieren", "Claude model for checks and questions": "Claude-Modell für Prüfungen und Fragen",
+  "Switch to dark mode": "Zum dunklen Modus wechseln", "Switch to light mode": "Zum hellen Modus wechseln",
+  "Sections": "Bereiche", "Quiz": "Quiz", "Notes": "Notizen", "Progress": "Fortschritt", "Question bank": "Fragenbank",
+  "day streak": "Tage in Folge", "Note": "Notiz", "Back to the previous note": "Zurück zur vorherigen Notiz",
+  "Open in Obsidian": "In Obsidian öffnen", "Close the note": "Notiz schliessen",
+  "Single choice": "Einfachauswahl", "Multiple choice": "Mehrfachauswahl", "Kprim (true/false)": "Kprim (richtig/falsch)",
+  "Number": "Zahl", "Open answer": "Offene Antwort", "select all that apply": "alle zutreffenden", "number": "Zahl", "open answer": "offene Antwort",
+  "Filter notes": "Notizen filtern", "This vault has no notes yet.": "Dieser Vault hat noch keine Notizen.", "No note matches.": "Keine Notiz passt.",
+  "Newest of each": "Jeweils das neueste", "Specific version": "Bestimmte Version", "Other model ID…": "Andere Modell-ID…",
+  "Ask Claude about this note": "Claude zu dieser Notiz fragen", "Ask Claude": "Claude fragen", "You": "Du",
+  "Your question for Claude": "Deine Frage an Claude", "Ask a follow-up": "Nachfragen", "e.g. Why is my answer wrong?": "z. B. Warum ist meine Antwort falsch?",
+  "Ask": "Fragen", "The study server isn't running.": "Der Studyloop-Server läuft nicht.", "the study server isn't running": "der Studyloop-Server läuft nicht",
+  "Claude reads this note. Enter sends, Shift+Enter adds a line.": "Claude liest diese Notiz. Enter sendet, Shift+Enter gibt eine neue Zeile.",
+  "Claude sees the question, your answer and the note section. Enter sends, Shift+Enter adds a line.": "Claude sieht die Frage, deine Antwort und den Notizabschnitt. Enter sendet, Shift+Enter gibt eine neue Zeile.",
+  "Leave this round? Your answers are lost.": "Runde verlassen? Deine Antworten gehen verloren.", "Leave this round?": "Runde verlassen?",
+  "Start": "Starten", "Practice": "Üben", "Open concepts come up 4× as often": "Offene Konzepte kommen 4× so oft dran", "open concepts": "offene Konzepte",
+  "Question type": "Fragetyp", "All types": "Alle Typen", "Start 4-question round": "Runde mit 4 Fragen starten", "Select none": "Keine wählen", "Select all": "Alle wählen",
+  "The bank is empty. Add questions under “Question bank”.": "Die Fragenbank ist leer. Füge Fragen unter „Fragenbank“ hinzu.",
+  "To do": "To-do", "New task": "Neue Aufgabe", "e.g. Redo HS24 mock OA.2": "z. B. HS24-Probeprüfung OA.2 wiederholen", "Add": "Hinzufügen",
+  "Pick at least one area": "Wähle mindestens einen Bereich", "No matching questions": "Keine passenden Fragen", "All clear": "Alles erledigt",
+  "Nothing here yet. Add what you still need to study.": "Noch nichts da. Trag ein, was du noch lernen musst.",
+  "Round from Claude": "Runde von Claude", "Practice round": "Übungsrunde", "Round": "Runde", "Back to start": "Zurück zum Start", "Leave": "Verlassen",
+  "Another round": "Noch eine Runde", "Submit answers": "Antworten abgeben", "That isn't a number.": "Das ist keine Zahl.", "Copied": "Kopiert",
+  "Select all that apply.": "Wähle alle zutreffenden.", "✓ missed": "✓ verpasst", "✓ correct": "✓ richtig", "✗ your answer": "✗ deine Antwort", "✗ it's true": "✗ ist richtig", "✗ it's false": "✗ ist falsch",
+  "True": "Richtig", "False": "Falsch", "true": "richtig", "false": "falsch", "Your answer": "Deine Antwort",
+  "Your answer (Tab inserts 4 spaces)": "Deine Antwort (Tab fügt 4 Leerzeichen ein)",
+  "Correct": "Richtig", "Skipped": "Übersprungen", "Not quite": "Nicht ganz", "answer": "Lösung", "Model answer": "Musterlösung", "Right": "Richtig",
+  "that isn't a number": "das ist keine Zahl", "full points": "volle Punktzahl", "half points": "halbe Punktzahl", "no points": "keine Punkte",
+  "checked by Claude": "von Claude geprüft", "your call": "selbst bewertet", "I had it": "Hatte ich", "I missed it": "Hatte ich nicht", "Check with Claude": "Von Claude prüfen lassen",
+  "Compare your answer with the model answer, or let Claude check it. Either way it goes into your concept tracker.": "Vergleich deine Antwort mit der Musterlösung oder lass Claude sie prüfen. So oder so kommt sie in deinen Konzept-Tracker.",
+  "Compare your answer with the model answer. Either way it goes into your concept tracker.": "Vergleich deine Antwort mit der Musterlösung. So oder so kommt sie in deinen Konzept-Tracker.",
+  "Sent": "Gesendet", "Start it again (": "Starte ihn neu (", "), then save. Your answers stay on this page.": ") und speichere dann. Deine Antworten bleiben auf dieser Seite.",
+  "Try saving again": "Nochmals speichern", "Or paste this to Claude": "Oder füge das bei Claude ein", "Go back to Claude and say": "Geh zurück zu Claude und schreib",
+  ". Claude grades it and updates your StudyVault.": ". Claude bewertet die Runde und aktualisiert deine StudyVault.",
+  "Answer string, if Claude can't read the file": "Antwort-Text, falls Claude die Datei nicht lesen kann", "Copy": "Kopieren",
+  "Saved. Nothing is recorded in the concept files yet.": "Gespeichert. In den Konzeptdateien ist noch nichts erfasst.",
+  "Open answers still need a grade: compare them with the model answer below or let Claude check them.": "Offene Antworten brauchen noch eine Bewertung: Vergleich sie unten mit der Musterlösung oder lass Claude sie prüfen.",
+  "Open answers still need a grade: compare them with the model answer below.": "Offene Antworten brauchen noch eine Bewertung: Vergleich sie unten mit der Musterlösung.",
+  "Clean sweep.": "Alles richtig.", "graded correct": "richtig", "answers submitted": "Antworten abgegeben",
+  "Could not load progress.": "Fortschritt konnte nicht geladen werden.", "questions tracked": "Fragen erfasst", "answered this week": "diese Woche beantwortet",
+  "By area": "Nach Bereich", "from concepts/*.md": "aus concepts/*.md", "not tested yet": "noch nicht getestet", "no data": "keine Daten",
+  "Drill": "Üben", "no bank": "keine Fragen", "no bank questions": "keine Fragen in der Fragenbank", "Open concepts": "Offene Konzepte",
+  "missed last time": "zuletzt falsch", "No error note.": "Keine Fehlernotiz.", "Nothing open. Every tested concept was right last time.": "Nichts offen. Jedes getestete Konzept war zuletzt richtig.",
+  "Streak": "Serie", "Questions answered per day in the browser, last six weeks": "Beantwortete Fragen pro Tag im Browser, letzte sechs Wochen",
+  "none": "keine", "started": "angefangen", "halfway": "halb", "current streak": "aktuelle Serie", "This wk": "Diese Wo.", "Today, ": "Heute, ",
+  "upcoming": "kommt noch", ", part of streak": ", Teil der Serie", "No questions in this area yet": "Noch keine Fragen in diesem Bereich",
+  "New area (press Enter)": "Neuer Bereich (Enter drücken)", "new-area-slug": "neuer-bereich", "New question": "Neue Frage", "Edit": "Bearbeiten",
+  "No questions yet.": "Noch keine Fragen.", "Create an area on the left.": "Leg links einen Bereich an.", "Delete": "Löschen", "Close": "Schliessen", "Save": "Speichern",
+  "Type": "Typ", "Language": "Sprache", "Difficulty": "Schwierigkeit", "Prompt (supports `inline` and ``` fences)": "Aufgabe (mit `inline` und ```-Blöcken)",
+  "Code (indentation kept exactly)": "Code (Einrückung bleibt genau erhalten)",
+  "Options (tick the correct one; multi-line options render as code)": "Antworten (die richtige ankreuzen; mehrzeilige werden als Code gezeigt)",
+  "Options (tick the correct ones; multi-line options render as code)": "Antworten (die richtigen ankreuzen; mehrzeilige werden als Code gezeigt)",
+  "Render all options as code (e.g. program output)": "Alle Antworten als Code zeigen (z. B. Programmausgabe)", "Add option": "Antwort hinzufügen",
+  "Statements (usually 4; set each one true or false)": "Aussagen (meist 4; jede auf richtig oder falsch setzen)", "Add statement": "Aussage hinzufügen",
+  "Correct answer": "Richtige Antwort", "Tolerance (±, empty = exact)": "Toleranz (±, leer = exakt)", "Unit": "Einheit", "e.g. CHF, %": "z. B. CHF, %",
+  "Explanation (shown after grading, and used as the key point in error notes)": "Erklärung (nach der Bewertung gezeigt und als Kernpunkt in Fehlernotizen verwendet)",
+  "Source": "Quelle", "e.g. HS24 exam OA.3": "z. B. HS24-Prüfung OA.3",
+  "Note section (Note title#Heading; leave empty to pick it automatically)": "Notizabschnitt (Notiztitel#Überschrift; leer lassen für die automatische Wahl)",
+  "finding the best section…": "suche den passenden Abschnitt…", "no matching note": "keine passende Notiz",
+  "That note isn't in the vault; the automatic pick is used instead.": "Diese Notiz ist nicht im Vault; stattdessen gilt die automatische Wahl.",
+  "Preview": "Vorschau", "Deleted": "Gelöscht", "Saved": "Gespeichert", "1 change": "1 Änderung", "Updating…": "Wird aktualisiert…", "Restarting…": "Startet neu…",
+  "Restart failed: open Studyloop again": "Neustart fehlgeschlagen: Studyloop neu öffnen",
+  "Claude model ID, for example claude-opus-4-8 or claude-sonnet-4-6:": "Claude-Modell-ID, zum Beispiel claude-opus-4-8 oder claude-sonnet-4-6:",
+  "That isn't a Claude model ID (they start with claude-)": "Das ist keine Claude-Modell-ID (die beginnen mit claude-)",
+};
+const DE_PAT = [
+  [/^“(.*)” isn't in this vault$/s, "„$1“ ist nicht in diesem Vault"], [/^Read: (.*)$/s, "Nachlesen: $1"], [/^(.*) \+(\d+) more$/s, "$1 +$2 weitere"],
+  [/^(.+) \(newest\)$/, "$1 (neuestes)"], [/^Claude (.+) is thinking…$/, "Claude $1 denkt nach…"], [/^Claude (.+) is reading your answer…$/, "Claude $1 liest deine Antwort…"],
+  [/^Claude (.+) answers from now on$/, "Ab jetzt antwortet Claude $1"], [/^Q(\d+) is unanswered\. Submit anyway\?$/, "F$1 ist unbeantwortet. Trotzdem abgeben?"],
+  [/^Delete: (.*)$/s, "Löschen: $1"], [/^Delete (.+)\?$/, "$1 löschen?"], [/^Edit (.+)$/, "$1 bearbeiten"],
+  [/^Round from Claude · (\d+) questions$/, "Runde von Claude · $1 Fragen"], [/^Round from Claude · (.*)$/, "Runde von Claude · $1"], [/^Practice round · (.*)$/, "Übungsrunde · $1"],
+  [/^(\d+) open$/, "$1 offen"], [/^(\d+) of (\d+) done$/, "$1 von $2 erledigt"], [/^(\d+) of (\d+) answered$/, "$1 von $2 beantwortet"], [/^(\d+) of (\d+) right$/, "$1 von $2 richtig"],
+  [/^(\d+)\/(\d+) right$/, "$1/$2 richtig"], [/^Could not save: (.*?)(\.?)$/s, (_, m, dot) => `Speichern fehlgeschlagen: ${tr(m)}${dot}`],
+  [/^Options for question (\d+)$/, "Antworten zu Frage $1"], [/^Question (\d+)$/, "Frage $1"], [/^Q(\d+)$/, "F$1"],
+  [/^Statement (\d+) is$/, "Aussage $1 ist"], [/^Statement (\d+)$/, "Aussage $1"], [/^Remove statement (\d+)$/, "Aussage $1 entfernen"],
+  [/^Option ([A-H]) is correct$/, "Antwort $1 ist richtig"], [/^Option ([A-H])$/, "Antwort $1"], [/^Remove option ([A-H])$/, "Antwort $1 entfernen"],
+  [/^Saved to your StudyVault: 1 answer recorded and the Learning Dashboard recomputed\.$/, "In deiner StudyVault gespeichert: 1 Antwort erfasst und das Lern-Dashboard neu berechnet."],
+  [/^Saved to your StudyVault: (\d+) answers recorded and the Learning Dashboard recomputed\.$/, "In deiner StudyVault gespeichert: $1 Antworten erfasst und das Lern-Dashboard neu berechnet."],
+  [/^overall · (.*)$/, "gesamt · $1"], [/^(\d+) percent$/, "$1 Prozent"], [/^best (\d+) days?$/, "Bestwert $1 Tage"], [/^(\d+)\+ questions$/, "$1+ Fragen"],
+  [/^(\d+) questions?$/, (_, n) => n === "1" ? "1 Frage" : n + " Fragen"], [/^\/ (\d+) questions today$/, "/ $1 Fragen heute"],
+  [/^Concept \(a row name in (.+); hidden until graded, and used for tracking\)$/, "Konzept (ein Zeilenname in $1; bis zur Bewertung verborgen, wird fürs Tracking verwendet)"],
+  [/^auto: (.*)$/s, "automatisch: $1"], [/^(\d+) changes$/, "$1 Änderungen"], [/^1 change on GitHub/, "1 Änderung auf GitHub"], [/^(\d+) changes on GitHub/, "$1 Änderungen auf GitHub"],
+  [/^Update Studyloop \((.+)\)\? The page reloads when it's done; nothing in your vaults changes\.$/, (_, n) => `Studyloop aktualisieren (${tr(n)})? Die Seite lädt danach neu; an deinen Vaults ändert sich nichts.`],
+  [/^Round not found: (.*)$/s, "Runde nicht gefunden: $1"],
+];
+function tr(s) {
+  if (LANG !== "de" || typeof s !== "string") return s;
+  const [, pre, core, post] = s.match(/^(\s*)([\s\S]*?)(\s*)$/);
+  if (!core) return s;
+  let out = Object.hasOwn(DE, core) ? DE[core] : undefined;
+  if (out === undefined) for (const [re, rep] of DE_PAT) if (re.test(core)) { out = core.replace(re, rep); break; }
+  return out === undefined ? s : pre + out + post;
+}
+// What holds notes, questions or other vault content: left as written.
+const KEEP = ".prose, .prompt, .body, pre, code, .note, .paste, .t, .alist, #vault, .thread, .verdict > p, .verdict > ul, .graded > p, textarea, script, style";
+const ATTRS = ["placeholder", "aria-label", "title", "label"];
+const english = new WeakMap();  // node -> { text or attribute: [English, German] } for switching back
+function localizeNode(n) {
+  if (n.nodeType === 3) {
+    const was = english.get(n), en = was && n.data === was[1] ? was[0] : n.data, out = tr(en);
+    if (out !== n.data) { n.data = out; }
+    if (out !== en) english.set(n, [en, out]); else english.delete(n);
+    return;
+  }
+  const map = english.get(n) || {};
+  for (const a of ATTRS) {
+    if (!n.hasAttribute(a)) continue;
+    const v = n.getAttribute(a), en = map[a] && v === map[a][1] ? map[a][0] : v, out = tr(en);
+    if (out !== v) n.setAttribute(a, out);
+    if (out !== en) map[a] = [en, out]; else delete map[a];
+  }
+  english.set(n, map);
+}
+function localize(root) {
+  if (root.nodeType === 3) { if (!root.parentElement?.closest(KEEP)) localizeNode(root); return; }
+  if (root.nodeType !== 1 || root.closest(KEEP)) return;
+  localizeNode(root);
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+    { acceptNode: x => x.nodeType === 1 && x.matches(KEEP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  for (let x = w.nextNode(); x; x = w.nextNode()) localizeNode(x);
+}
+new MutationObserver(ms => {
+  if (LANG === "en") return;
+  for (const m of ms) {
+    if (m.type === "attributes") { if (!m.target.closest(KEEP)) localizeNode(m.target); }
+    else m.addedNodes.forEach(localize);
+  }
+}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ATTRS });
+for (const f of ["alert", "confirm", "prompt"]) { const orig = window[f]; window[f] = (msg, ...rest) => orig.call(window, tr(String(msg ?? "")), ...rest); }
+function setLang(l) {
+  const next = l === "de" ? "de" : "en";
+  if (next === LANG) return;
+  LANG = next; document.documentElement.lang = LANG;
+  localize(document.body);
+}
 function markTheme() {
   const dark = document.documentElement.dataset.theme === "dark", b = $("#theme-toggle");
   b.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode"); b.title = b.getAttribute("aria-label");
@@ -1291,9 +1431,9 @@ function questionHTML(q, i, locked) {
     if (show) {
       const g = grade(q, a), ok = g.correct === true;
       let extra = "";
-      if (q.type === "kprim" && g.has) extra = ` · ${g.right} of ${q.answer.length} right` + (q.answer.length === 4 ? ` (Kprim: ${g.right === 4 ? "full points" : g.right === 3 ? "half points" : "no points"})` : "");
-      if (q.type === "numeric" && g.has && g.value === null) extra = " · that isn't a number";
-      verdict = `<div class="verdict ${ok ? "ok" : "bad"}"><strong>${ok ? say("Correct", "Nice") : !g.has ? "Skipped" : say("Not quite", "Not this time")}</strong> · answer ${inline(keyText(q))}${extra}${q.explanation ? md(q.explanation, q.lang) : ""}</div>`;
+      if (q.type === "kprim" && g.has) extra = ` · ${tr(`${g.right} of ${q.answer.length} right`)}` + (q.answer.length === 4 ? ` (Kprim: ${tr(g.right === 4 ? "full points" : g.right === 3 ? "half points" : "no points")})` : "");
+      if (q.type === "numeric" && g.has && g.value === null) extra = " · " + tr("that isn't a number");
+      verdict = `<div class="verdict ${ok ? "ok" : "bad"}"><strong>${ok ? say("Correct", "Nice") : !g.has ? "Skipped" : say("Not quite", "Not this time")}</strong> · ${tr("answer")} ${inline(keyText(q))}${extra}${q.explanation ? md(q.explanation, q.lang) : ""}</div>`;
     } else if (q.type === "open" && (q.model_answer || q.explanation)) {
       verdict = `<div class="verdict open"><strong>Model answer</strong>${md(q.model_answer || "", q.lang)}${q.explanation ? md(q.explanation, q.lang) : ""}${gradeBox(q, i)}</div>`;
     }
@@ -1317,7 +1457,7 @@ function gradeBox(q, i) {
   const sa = submitted?.answers?.[i];
   if (!sa || round.source !== "bank" || submitted.saveError || !q.model_answer || !(sa.text || "").trim()) return "";
   if (sa.recorded) {
-    const by = sa.graded_by === "claude" ? "checked by Claude" : "your call";
+    const by = tr(sa.graded_by === "claude" ? "checked by Claude" : "your call");
     return `<div class="graded ${sa.correct ? "is-right" : "is-wrong"}"><strong>${sa.correct ? say("Right", "You had it") : say("Not quite", "Not this time")}</strong> · ${by}${sa.feedback ? `<p>${inline(sa.feedback)}</p>` : ""}</div>`;
   }
   if (sa._busy) return `<div class="selfgrade" aria-live="polite"><span class="spin" aria-hidden="true"></span><span class="meta">Claude ${esc(modelName(currentModel()))} is reading your answer…</span></div>`;
@@ -1417,7 +1557,7 @@ async function renderProgress() {
       <p class="big"><b>${wkTotal}</b><span>answered this week</span></p></div></section>
     <div class="two"><section class="block" aria-labelledby="areas-h">
       <div class="section-head"><h2 id="areas-h">By area</h2><p class="meta">from concepts/*.md</p></div>
-      ${P.areas.map(a => `<div class="prow"><div class="name">${esc(a.title)}<span class="meta">${a.attempts ? `${a.correct} of ${a.attempts} · ${a.rate}% · ${esc(levelWord(a.level))}` : "not tested yet"}${a.open ? ` · ${a.open} open` : ""}</span></div>
+      ${P.areas.map(a => `<div class="prow"><div class="name">${esc(a.title)}<span class="meta">${a.attempts ? `${a.correct} ${LANG === "de" ? "von" : "of"} ${a.attempts} · ${a.rate}% · ${esc(levelWord(a.level))}` : tr("not tested yet")}${a.open ? ` · ${tr(`${a.open} open`)}` : ""}</span></div>
           <div class="bar ${a.rate === null ? "none" : ""}" role="img" aria-label="${a.rate === null ? "no data" : a.rate + " percent"}">${a.rate === null ? "" : `<i data-l="${lvl(a.rate)}" style="width: ${a.rate}%"></i>`}</div>
           <div class="acts">${a.bank ? `<button class="btn btn--sm" data-drill="${a.slug}">Drill</button>` : `<span class="chip" title="no bank questions">no bank</span>`}</div></div>`).join("")}
     </section><div class="stack">
@@ -1427,7 +1567,7 @@ async function renderProgress() {
     </section>
     <section class="block" aria-labelledby="streak-h"><div class="section-head"><h2 id="streak-h">Streak</h2><p class="meta">best ${Math.max(bestStreak(), streakNow())} days</p></div>
       <table class="grid"><caption class="sr-only">Questions answered per day in the browser, last six weeks</caption>
-        <thead><tr><td class="corner"></td>${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => `<th scope="col">${d}</th>`).join("")}</tr></thead><tbody>${streakRows()}</tbody></table>
+        <thead><tr><td class="corner"></td>${(LANG === "de" ? ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]).map(d => `<th scope="col">${d}</th>`).join("")}</tr></thead><tbody>${streakRows()}</tbody></table>
       <div class="legend" aria-hidden="true"><span><i class="swatch"></i>none</span><span><i class="swatch" data-level="1"></i>started</span><span><i class="swatch" data-level="2"></i>halfway</span><span><i class="swatch" data-level="3"></i>${GOAL}+ questions</span><span><i class="swatch s-streak"></i>current streak</span></div>
     </section></div></div>`;
   app.querySelectorAll("[data-drill]").forEach(b => b.onclick = async () => {
@@ -1445,7 +1585,9 @@ function loopRing(rate) {
     ${rate === null || rate === undefined ? "" : `<circle cx="${(32 + r * Math.cos(a)).toFixed(1)}" cy="${(32 + r * Math.sin(a)).toFixed(1)}" r="3.2" class="loop__dot"/>`}</svg>`;
 }
 function streakRows() {
-  const WEEKS = 6, M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], D = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const de = LANG === "de", WEEKS = 6;
+  const M = de ? ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"] : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const D = de ? ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"] : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const today = new Date(), tk = dayKey(today), start = addDays(monday(today), -7 * (WEEKS - 1));
   const s = streakNow(), inStreak = new Set();
   { let d = count(today) ? today : addDays(today, -1); for (let i = 0; i < s; i++) { inStreak.add(dayKey(d)); d = addDays(d, -1); } }
@@ -1453,11 +1595,11 @@ function streakRows() {
   let out = "";
   for (let w = 0; w < WEEKS; w++) {
     const wk = addDays(start, w * 7);
-    out += `<tr><th scope="row">${w === WEEKS - 1 ? "This wk" : `${wk.getDate()} ${M[wk.getMonth()]}`}</th>`;
+    out += `<tr><th scope="row">${w === WEEKS - 1 ? tr("This wk") : `${wk.getDate()}${de ? "." : ""} ${M[wk.getMonth()]}`}</th>`;
     for (let i = 0; i < 7; i++) {
       const d = addDays(wk, i), k = dayKey(d), n = count(d), future = d > today && k !== tk;
       const cls = ["cell", future && "is-future", k === tk && "is-today", inStreak.has(k) && "in-streak"].filter(Boolean).join(" ");
-      out += `<td><div class="${cls}" ${future ? "" : `data-level="${level(n)}"`}>${n ? `<span aria-hidden="true">${n}</span>` : ""}<span class="sr-only">${k === tk ? "Today, " : ""}${D[i]} ${d.getDate()} ${M[d.getMonth()]}: ${future ? "upcoming" : `${n} question${n === 1 ? "" : "s"}`}${inStreak.has(k) ? ", part of streak" : ""}</span></div></td>`;
+      out += `<td><div class="${cls}" ${future ? "" : `data-level="${level(n)}"`}>${n ? `<span aria-hidden="true">${n}</span>` : ""}<span class="sr-only">${k === tk ? tr("Today, ") : ""}${D[i]} ${d.getDate()}${de ? "." : ""} ${M[d.getMonth()]}: ${future ? tr("upcoming") : tr(`${n} question${n === 1 ? "" : "s"}`)}${inStreak.has(k) ? tr(", part of streak") : ""}</span></div></td>`;
     }
     out += "</tr>";
   }
@@ -1687,10 +1829,13 @@ async function checkUpdate() {
   const sel = $("#vault");
   sel.innerHTML = vaults.map(v => `<option value="${esc(v.id)}">${esc(v.id)}</option>`).join("");
   sel.value = vault; sel.hidden = vaults.length < 2;
+  const langOf = id => vaults.find(v => v.id === id)?.language;
+  setLang(langOf(vault));
   const loadNames = async () => { try { areaNames = Object.fromEntries((await api("/api/areas")).map(a => [a.slug, a.title])); } catch (_) {} };
   sel.onchange = async () => {
     if (round && !submitted && !confirm("Leave this round?")) { sel.value = vault; return; }
     vault = sel.value; try { localStorage.setItem("study-vault", vault); } catch (_) {}
+    setLang(langOf(vault));
     round = null; bankState = { areas: [], slug: null, bank: null, editing: null };
     notesTree = null; noteCache.clear(); notesState = { path: null, anchor: "", filter: "" };
     await Promise.all([loadNames(), loadProgress()]); setView(view);
