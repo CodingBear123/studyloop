@@ -99,6 +99,16 @@ def detect_language(folder, enough=400):
     return best if hits[best] >= 30 and hits[best] >= 2 * rest else None
 
 
+IMAGE_EMBED_RE = re.compile(r"!\[\[([^\]|#\n]+?\.(?:png|jpe?g|gif|svg|webp))\s*(?:[|#][^\]\n]*)?\]\]", re.I)
+
+
+def embedded_images(q):
+    """Image names a question embeds with ![[file.png]] in its text (code spans and the code field don't count)."""
+    parts = [q.get("prompt"), q.get("explanation"), q.get("model_answer"), *(q.get("options") or []), *(q.get("statements") or [])]
+    text = re.sub(r"`[^`]*`", "", "\n".join(p for p in parts if isinstance(p, str)))
+    return list(dict.fromkeys(m.strip() for m in IMAGE_EMBED_RE.findall(text)))
+
+
 def labels(lang):
     return LABELS.get((lang or "en")[:2], LABELS["en"])
 
@@ -804,6 +814,12 @@ class Vault:
                 E += [f"{tag}: {e}" for e in validate_question(q, f"question {i}", need_answer=True)]
                 if not clean_cell(q.get("concept") or ""):
                     W.append(f"{tag}: {q.get('id')} has no concept, so bank rounds can't track it")
+                for name in embedded_images(q):
+                    import notes  # noqa: PLC0415 (only needed for this check)
+                    try:
+                        notes.Notes(self).asset(name)
+                    except ValueError:
+                        W.append(f"{tag}: {q.get('id')} embeds ![[{name}]], which is not in the vault")
                 if q.get("ref"):
                     import notes  # noqa: PLC0415 (only needed for this check)
                     if not notes.Notes(self).resolve_ref(q["ref"]):

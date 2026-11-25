@@ -65,6 +65,12 @@ true/false per statement (`[true, false, false, true]`). `numeric`: a number (`1
 `tolerance` (± absolute, default exact) and `unit` (`"CHF"`, `"%"`); the page accepts `1'024`, `1 024`, `7,7`,
 `3/4`. `open`: no `answer`; the bank gives `model_answer`.
 
+**Images.** `prompt`, `options`, `statements`, `explanation` and `model_answer` can embed an image from the
+vault the Obsidian way: `![[diagram.png]]`, `![[diagram.png|Alt text]]` or `![[diagram.png|300]]` (width in
+pixels). A vault path or just the file name works; the page loads it through `/api/asset` and fits it to the
+card. `studyvault.py check` warns when an embedded image is not in the vault. Inside backticks and in `code`
+it stays text.
+
 **Note reference.** After grading, every question links to the note section that covers it ("Read: Note ›
 Heading", opens in a side panel). `ref` names it as `Note title#Heading` or `folder/Note.md#Heading`. Without
 `ref` the server picks the section of the question's area whose words match the concept, prompt and

@@ -424,7 +424,8 @@ a.link-btn { font-size: .875rem; }
 .prose mark { background: var(--warn-soft); color: inherit; padding: 0 2px; border-radius: 3px; box-shadow: inset 0 -2px 0 var(--warn); }
 .prose strong { font-weight: 600; }
 .prose :not(pre) > code, .prompt :not(pre) > code { color: var(--plum); background: var(--plum-soft); }
-.prose img { max-width: 100%; height: auto; border-radius: var(--r); }
+.prose img, img.embed { max-width: 100%; height: auto; border-radius: var(--r); }
+img.embed { display: block; margin: .5rem 0; }
 .prose .tbl { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--line); border-radius: var(--r); }
 .prose table { border-collapse: collapse; width: 100%; font-size: .9375rem; margin: 0; line-height: 1.5; }
 .prose th, .prose td { border-bottom: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; }
@@ -794,9 +795,19 @@ const deEmoji = html => html.replace(EMOJI, (m, known) => known ? MARKS[known] :
 const STATUS = { open: "open", solved: "solved", untested: "untested", offen: "open", "gelöst": "solved", neu: "untested",
   weak: "weak", fair: "fair", good: "good", mastered: "mastered", unmeasured: "none", schwach: "weak", mittel: "fair", gut: "good", sicher: "mastered", ungemessen: "none" };
 const statusCell = html => { const k = STATUS[html.trim().toLowerCase()]; return k ? `<span class="st" data-s="${k}">${html.trim()}</span>` : html; };
+// ![[file.png]] (or ![[file.png|alt]], ![[file.png|300]] for a width): the image from the vault, via /api/asset.
+const IMG_EMBED = /!\[\[([^\]\n]+?)\]\]/g;
+function embedHTML(inner) {
+  const bar = inner.search(/\\?\|/), target = (bar < 0 ? inner : inner.slice(0, bar)).trim(), alias = bar < 0 ? "" : inner.slice(bar).replace(/^\\?\|/, "").trim();
+  if (!IMG.test(target)) return null;
+  const w = alias.match(/^(\d+)(?:x\d+)?$/);
+  return `<img class="embed" src="${esc(apiURL("/api/asset?path=" + encodeURIComponent(target)))}" alt="${esc(w ? target : alias || target)}"${w ? ` width="${w[1]}"` : ""} loading="lazy">`;
+}
 function inline(src) {
   const keep = [], hold = h => `\u0000${keep.push(h) - 1}\u0000`;
-  const s = holdMath(String(src ?? "").replace(/`([^`]+)`/g, (_, c) => hold(`<code>${esc(c)}</code>`)), hold);
+  let s = String(src ?? "").replace(/`([^`]+)`/g, (_, c) => hold(`<code>${esc(c)}</code>`));
+  s = s.replace(IMG_EMBED, (m, inner) => { const h = embedHTML(inner); return h ? hold(h) : m; });
+  s = holdMath(s, hold);
   return deEmoji(esc(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\\\$/g, () => "$")).replace(/\u0000(\d+)\u0000/g, (_, n) => keep[+n]);
 }
 function md(text, lang) {
@@ -867,7 +878,7 @@ function inl(src) {
   s = holdMath(s, hold);
   s = s.replace(/(!?)\[\[([^\]\n]+?)\]\]/g, (_, bang, inner) => {
     const bar = inner.search(/\\?\|/), target = (bar < 0 ? inner : inner.slice(0, bar)).trim(), alias = bar < 0 ? "" : inner.slice(bar).replace(/^\\?\|/, "").trim();
-    if (bang && IMG.test(target)) return hold(`<img src="${esc(apiURL("/api/asset?path=" + encodeURIComponent(target)))}" alt="${esc(alias || target)}" loading="lazy">`);
+    if (bang && IMG.test(target)) return hold(embedHTML(inner));
     const label = alias || target.replace(/^#/, "").replace(/#/, " › ");
     const to = wikiTarget(target);
     return hold(to ? `<a href="#" class="wl" data-path="${esc(to.path)}" data-anchor="${esc(to.anchor)}">${esc(label)}</a>`

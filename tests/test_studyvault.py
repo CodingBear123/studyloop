@@ -40,6 +40,19 @@ class VaultTests(unittest.TestCase):
         self.assertTrue((self.v.path / "concepts" / "binary-data.md").exists())
         self.assertTrue((self.v.path / "question-bank" / "closures.json").exists())
 
+    def test_check_warns_about_missing_embedded_images(self):
+        (self.v.path / "attachments").mkdir()
+        (self.v.path / "attachments" / "graph.png").write_bytes(b"\x89PNG")
+        q = {"id": "cl-001", "type": "single", "concept": "late binding", "answer": 0,
+             "prompt": "Which plot? ![[graph.png]] and ![[attachments/graph.png|300]], not `![[code.png]]`",
+             "options": ["![[gone.png|Alt]]", "b"]}
+        self.assertEqual(sv.embedded_images(q), ["graph.png", "attachments/graph.png", "gone.png"])
+        sv.write_json(self.v.bank_dir / "closures.json", {"area": "closures", "title": "Closures", "questions": [q]})
+        errs, warns = self.v.check()
+        self.assertEqual(errs, [])
+        self.assertEqual([w for w in warns if "embeds" in w],
+                         ["question-bank/closures.json: cl-001 embeds ![[gone.png]], which is not in the vault"])
+
     def test_record_and_recompute(self):
         self.v.record([
             {"area": "closures", "concept": "late binding", "correct": False,
