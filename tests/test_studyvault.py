@@ -400,6 +400,14 @@ class ServerTests(unittest.TestCase):
             (v / "01-Basics" / "Grundlagen.md").write_text("The bank is a firm that lends and takes deposits from the public. " * 10)
             self.assertEqual(sv.Vault(v).lang, "en")
 
+    def test_explanation_follows_the_shuffle(self):
+        text = "Kurz vorweg.\n(1) wahr: eins.\n(2) falsch: zwei\n  mit Fortsetzung.\n(3) wahr: drei.\n(4) falsch: vier."
+        self.assertEqual(server.reorder_explanation(text, [3, 0, 2, 1]),
+                         "Kurz vorweg.\n(1) falsch: vier.\n(2) wahr: eins.\n(3) wahr: drei.\n(4) falsch: zwei\n  mit Fortsetzung.")
+        self.assertEqual(server.reorder_explanation("A) yes\nB) no", [1, 0], letters=True), "A) no\nB) yes")
+        self.assertEqual(server.reorder_explanation("No numbers (2) here.", [1, 0]), "No numbers (2) here.")
+        self.assertIsNone(server.reorder_explanation("(1) only one of two", [1, 0]))
+
     def test_old_themes_become_light(self):
         self.assertEqual(server.clean_prefs({"theme": "tide"}), {"theme": "light"})
         self.assertEqual(server.clean_prefs({"theme": "garden"}), {"theme": "light"})

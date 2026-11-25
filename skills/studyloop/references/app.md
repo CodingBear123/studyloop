@@ -105,6 +105,9 @@ Other types: `multi` gives `choices` (sorted indexes) and `choice_letters` (`"AC
 `numeric` gives `text` (as typed) and `value` (parsed number or `null`). Every type but `open` has
 `choice_text`, a readable summary. Options and statements are shuffled only in bank rounds, so in your rounds
 indexes match your key.
+In a bank question's `explanation`, write one line per item starting with `(1)`, `(2)`… (Kprim) or `A)`,
+`B)`… (options): a shuffle moves and renumbers those lines with their items. If such marks cover only some
+items, the question is not shuffled.
 
 - `source: "claude"`: you grade everything, then `studyvault.py record` with the `round_id`, which sets
   `"tracked": true`.

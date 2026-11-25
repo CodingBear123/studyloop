@@ -153,6 +153,36 @@ def run_claude(prompt, model=None, schema=None, timeout=120):
         raise ValueError("Claude call failed: " + msg[-1][:200])
 
 
+def reorder_explanation(text, order, letters=False):
+    """Follow a shuffle in an explanation written per item: lines starting "(1)" (Kprim) or "(A)"/"A)" (options).
+
+    order[new] is the old index. Each marked line, with the lines after it up to the next mark, moves to its
+    item's new place and gets the new number. Returns the text unchanged when nothing is marked, and None
+    when the marks don't cover every item exactly once (the caller then doesn't shuffle)."""
+    n = len(order)
+    labels = [chr(65 + i) for i in range(n)] if letters else [str(i + 1) for i in range(n)]
+    mark = re.compile(r"^(\s*(?:[-*]\s+)?(?:\*\*)?\(?)([A-H]|[a-h])(\))" if letters
+                      else r"^(\s*(?:[-*]\s+)?(?:\*\*)?\()(\d)(\))")
+    lines = text.split("\n")
+    marked = [(i, m) for i, l in enumerate(lines) if (m := mark.match(l))]
+    if not marked:
+        return text
+    found = [m[2].upper() for _, m in marked]
+    if sorted(found) != sorted(labels):
+        return None
+    head = lines[:marked[0][0]]
+    blocks = {}
+    for k, (i, m) in enumerate(marked):
+        end = marked[k + 1][0] if k + 1 < len(marked) else len(lines)
+        blocks[labels.index(m[2].upper())] = (m, lines[i:end])
+    out = list(head)
+    for new, old in enumerate(order):
+        m, block = blocks[old]
+        label = labels[new] if m[2].isupper() or not letters else labels[new].lower()
+        out += [m[1] + label + m[3] + block[0][m.end():]] + block[1:]
+    return "\n".join(out)
+
+
 def lang_word(lang):
     return "German" if lang == "de" else "English"
 
@@ -319,21 +349,28 @@ class App:
                     break
             else:
                 picked.append(pool.pop()[1])
-        for q in picked:  # shuffle options or statements, remap the answer
+        for q in picked:  # shuffle options or statements, remap the answer and the explanation's (1)/(A) lines
             if not q.get("shuffle", True):
                 continue
-            if q.get("type") in ("single", "multi"):
-                order = list(range(len(q["options"])))
-                random.shuffle(order)
-                q["options"] = [q["options"][i] for i in order]
+            kprim = q.get("type") == "kprim" and isinstance(q.get("answer"), list)
+            if q.get("type") not in ("single", "multi") and not kprim:
+                continue
+            items = q["statements"] if kprim else q["options"]
+            order = list(range(len(items)))
+            random.shuffle(order)
+            expl = reorder_explanation(q.get("explanation") or "", order, letters=not kprim)
+            if expl is None:  # it refers to positions in a way we can't follow: keep the bank's order
+                continue
+            if q.get("explanation"):
+                q["explanation"] = expl
+            if kprim:
+                q["statements"], q["answer"] = [items[i] for i in order], [q["answer"][i] for i in order]
+            else:
+                q["options"] = [items[i] for i in order]
                 if isinstance(q.get("answer"), int):
                     q["answer"] = order.index(q["answer"])
                 elif isinstance(q.get("answer"), list):
                     q["answer"] = sorted(order.index(a) for a in q["answer"])
-            elif q.get("type") == "kprim" and isinstance(q.get("answer"), list):
-                pairs = list(zip(q["statements"], q["answer"]))
-                random.shuffle(pairs)
-                q["statements"], q["answer"] = [p[0] for p in pairs], [p[1] for p in pairs]
         return {"id": datetime.now().strftime("bank-%Y%m%d-%H%M%S"), "source": "bank",
                 "title": ", ".join(self.v.title(s) for s in slugs), "reveal": True,
                 "questions": self.with_notes(picked)}
