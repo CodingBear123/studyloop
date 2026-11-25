@@ -316,6 +316,9 @@ pre code, pre code.hljs { display: block; padding: 12px 16px; background: transp
 .bar.none { background: transparent; border-top: 1px dashed var(--line-2); height: 0; }
 .prow .acts { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 @media (max-width: 640px) { .prow { grid-template-columns: 1fr auto; } .prow .bar { grid-column: 1 / -1; grid-row: 2; } }
+.concepts { max-height: min(34rem, 62vh); overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px; padding: 0 6px;
+  scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.concepts:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; border-radius: var(--r-sm); }
 .concept { border-top: 1px solid var(--line); }
 .concept:first-of-type { border-top: 0; }
 .concept summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 8px; align-items: center; padding: 12px 4px; font-weight: 500; border-radius: var(--r-sm);
@@ -1576,8 +1579,8 @@ async function renderProgress() {
           <div class="acts">${a.bank ? `<button class="btn btn--sm" data-drill="${a.slug}">Drill</button>` : `<span class="chip" title="no bank questions">no bank</span>`}</div></div>`).join("")}
     </section><div class="stack">
     <section class="block" aria-labelledby="open-h"><div class="section-head"><h2 id="open-h">Open concepts</h2><p class="meta">${P.open.length ? "missed last time" : ""}</p></div>
-      ${P.open.length ? P.open.map(c => `<details class="concept"><summary><svg aria-hidden="true"><use href="#i-chev"/></svg><span>${esc(c.name)}</span><span class="tags"><span class="chip">${esc(c.area_title)}</span><span class="chip chip--mint">${c.correct}/${c.attempts} right</span></span></summary>
-          <div class="note">${c.note ? md(c.note) : `<p class="muted">No error note.</p>`}</div></details>`).join("") : `<p class="empty">Nothing open. Every tested concept was right last time.</p>`}
+      ${P.open.length ? `<div class="concepts" tabindex="0" aria-label="Open concepts">` + P.open.map(c => `<details class="concept"><summary><svg aria-hidden="true"><use href="#i-chev"/></svg><span>${esc(c.name)}</span><span class="tags"><span class="chip">${esc(c.area_title)}</span><span class="chip chip--mint">${c.correct}/${c.attempts} right</span></span></summary>
+          <div class="note">${c.note ? md(c.note) : `<p class="muted">No error note.</p>`}</div></details>`).join("") + `</div>` : `<p class="empty">Nothing open. Every tested concept was right last time.</p>`}
     </section>
     <section class="block" aria-labelledby="streak-h"><div class="section-head"><h2 id="streak-h">Streak</h2><p class="meta">best ${Math.max(bestStreak(), streakNow())} days</p></div>
       <table class="grid"><caption class="sr-only">Questions answered per day in the browser, last six weeks</caption>

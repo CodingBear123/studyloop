@@ -153,6 +153,12 @@ def run_claude(prompt, model=None, schema=None, timeout=120):
         raise ValueError("Claude call failed: " + msg[-1][:200])
 
 
+def answered(a):
+    """Whether a saved answer holds anything: a choice, ticked options, a Kprim true/false or typed text."""
+    return (a.get("choice") is not None or bool(a.get("choices"))
+            or any(x is not None for x in a.get("tf") or []) or bool((a.get("text") or "").strip()))
+
+
 def reorder_explanation(text, order, letters=False):
     """Follow a shuffle in an explanation written per item: lines starting "(1)" (Kprim) or "(A)"/"A)" (options).
 
@@ -537,8 +543,7 @@ class App:
         for r in self.v.results():
             day = (r.get("submitted_at") or "")[:10]
             if day:
-                activity[day] = activity.get(day, 0) + sum(
-                    1 for a in r.get("answers", []) if a.get("choice") is not None or (a.get("text") or "").strip())
+                activity[day] = activity.get(day, 0) + sum(1 for a in r.get("answers", []) if answered(a))
         return {"areas": areas, "open": open_concepts, "activity": activity,
                 "total": {"attempts": st["total"], "correct": st["correct"], "rate": st["rate"], "level": st["level"]}}
 

@@ -400,6 +400,12 @@ class ServerTests(unittest.TestCase):
             (v / "01-Basics" / "Grundlagen.md").write_text("The bank is a firm that lends and takes deposits from the public. " * 10)
             self.assertEqual(sv.Vault(v).lang, "en")
 
+    def test_every_answer_type_counts_as_answered(self):
+        for a in ({"choice": 0}, {"choices": [1, 2]}, {"tf": [None, True]}, {"text": " 42 "}):
+            self.assertTrue(server.answered(a), a)
+        for a in ({"choice": None}, {"choices": []}, {"tf": [None, None]}, {"text": "  "}, {}):
+            self.assertFalse(server.answered(a), a)
+
     def test_explanation_follows_the_shuffle(self):
         text = "Kurz vorweg.\n(1) wahr: eins.\n(2) falsch: zwei\n  mit Fortsetzung.\n(3) wahr: drei.\n(4) falsch: vier."
         self.assertEqual(server.reorder_explanation(text, [3, 0, 2, 1]),
