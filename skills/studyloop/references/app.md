@@ -140,8 +140,8 @@ chat: the page has no model answers for them.
 
 ## Asking Claude on the page
 
-After grading, every question has **Ask Claude**, and every note in the Notes tab and the side panel ends
-with an Ask box. Each message is one headless `claude -p` call like the check above (no tools, no files),
+After grading, every question has **Ask Claude**, and every note in the Notes tab and the side panel has
+an **Ask Claude** button above it that opens an Ask box docked to the bottom of the reader while you scroll. Each message is one headless `claude -p` call like the check above (no tools, no files),
 with the question, the user's answer, the answer key when the page has it, the note section and the thread
 so far in the prompt. The **Claude** picker in the header sets the model for checks and questions:
 the aliases (`sonnet`, `opus`, `haiku`, `fable`: newest of each), pinned versions (`claude-opus-4-8`, ...;

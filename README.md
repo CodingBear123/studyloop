@@ -217,7 +217,7 @@ ask Claude.
 | Tab | What's there |
 |---|---|
 | **Quiz** | the round Claude wrote, practice rounds from the question bank (pick areas and question types), your to-do list |
-| **Notes** | every note in the vault, readable and searchable, with an **Ask Claude** box at the end of each note |
+| **Notes** | every note in the vault, readable and searchable, with an **Ask Claude** button above each note that opens a box docked at the bottom while you read |
 | **Progress** | overall rate, rate per area, open concepts with what you mixed up, a daily streak |
 | **Question bank** | add, edit and delete bank questions per area |
 

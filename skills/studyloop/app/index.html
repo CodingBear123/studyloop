@@ -491,6 +491,11 @@ img.embed { display: block; margin: .5rem 0; }
 .askform .btn { flex: none; }
 .ask .note-hint { font-size: .8125rem; margin: 8px 0 0; }
 .ask .ask-h { font-family: var(--sans); font-weight: 600; font-size: 1rem; margin: 0 0 12px; }
+.ask-top { display: flex; align-items: center; gap: 8px; margin: -6px -6px 6px 0; }
+.ask-top .ask-h { flex: 1; margin: 0; }
+.ask--dock { position: sticky; bottom: 12px; z-index: 5; margin-top: 1.6rem; background: var(--surface);
+  box-shadow: 0 -10px 28px -14px rgba(0, 0, 0, .3); }
+.ask--dock .thread { max-height: min(45vh, 26rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 
 /* highlight.js: the same five muted inks as the callouts, nothing brighter. Every token starts as ink, so
    classes the CDN theme colours for light backgrounds (subst, operator, name...) never go dark-on-dark */
@@ -547,7 +552,7 @@ img.embed { display: block; margin: .5rem 0; }
 <main id="app"></main>
 <dialog class="drawer" id="drawer" aria-label="Note">
   <div class="drawer__bar"><button class="icon-btn" id="dr-back" aria-label="Back to the previous note" hidden><svg aria-hidden="true"><use href="#i-back"/></svg></button>
-    <p class="meta grow" id="dr-where"></p><a class="link-btn" id="dr-obsidian" href="#">Open in Obsidian</a>
+    <p class="meta grow" id="dr-where"></p><button type="button" class="btn btn--sm" id="dr-ask" hidden aria-expanded="false"><svg aria-hidden="true"><use href="#i-ask"/></svg>Ask Claude</button><a class="link-btn" id="dr-obsidian" href="#">Open in Obsidian</a>
     <button class="icon-btn" id="dr-close" aria-label="Close the note"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
   <div class="drawer__body" id="dr-body"></div>
 </dialog>
@@ -1073,7 +1078,7 @@ async function openDrawer(path, anc, push = true) {
   $("#dr-where").textContent = (g ? g.title + " · " : "") + note.title;
   $("#dr-obsidian").href = obsidianURL(note.abs);
   if (claudeCheck) body.insertAdjacentHTML("beforeend", noteAskHTML(note));
-  wireAsks(body);
+  wireAsks(body); wireNoteAsk($("#dr-ask"), body, note);
 }
 $("#dr-close").onclick = () => $("#drawer").close();
 $("#drawer").addEventListener("close", () => { drawer.stack = []; });
@@ -1098,7 +1103,7 @@ async function renderNotes() {
   app.innerHTML = `<div class="notes"><nav class="block tree" aria-label="Notes">
       <label class="sr-only" for="nfilter">Filter notes</label><input class="field" id="nfilter" type="search" placeholder="Filter notes" value="${esc(notesState.filter)}" autocomplete="off">
       <div id="ntree">${treeHTML()}</div></nav>
-    <section class="block" aria-label="Note"><div class="reader-bar"><p class="meta grow" id="nwhere"></p><a class="link-btn" id="nobs" href="#">Open in Obsidian</a></div><div id="nbody"></div></section></div>`;
+    <section class="block" aria-label="Note"><div class="reader-bar"><p class="meta grow" id="nwhere"></p><button type="button" class="btn btn--sm" id="nask" hidden aria-expanded="false"><svg aria-hidden="true"><use href="#i-ask"/></svg>Ask Claude</button><a class="link-btn" id="nobs" href="#">Open in Obsidian</a></div><div id="nbody"></div></section></div>`;
   $("#nfilter").oninput = e => { notesState.filter = e.target.value; $("#ntree").innerHTML = treeHTML(); };
   $("#ntree").onclick = e => {
     const a = e.target.closest("a[data-path]"); if (!a) return;
@@ -1139,7 +1144,7 @@ async function paintNote() {
   $("#nwhere").title = srcs.join("\n");
   $("#nobs").href = obsidianURL(note.abs);
   if (claudeCheck) body.insertAdjacentHTML("beforeend", noteAskHTML(note));
-  wireAsks(body);
+  wireAsks(body); wireNoteAsk($("#nask"), body, note);
 }
 function openInNotes(path, anc) {
   const same = path === notesState.path;
@@ -1175,8 +1180,28 @@ function modelOptions(ms, extra) {
 function currentModel() { const m = $("#model"); return (m && m.value && m.value !== "__other" && m.value) || defaultModel; }
 function noteAskHTML(note) {
   const k = "n:" + note.path, s = askState(k);
-  s.ctx = { note: { path: note.path, anchor: "" } }; s.open = true;
-  return `<section class="ask" data-ask="${esc(k)}" aria-label="Ask Claude about this note" style="margin-top:1.6rem"></section>`;
+  s.ctx = { note: { path: note.path, anchor: "" } };
+  return `<section class="ask ask--dock" data-ask="${esc(k)}" aria-label="Ask Claude about this note" hidden></section>`;
+}
+// The note's ask box opens from the button above the note and stays docked at the bottom of the reader.
+function wireNoteAsk(btn, body, note) {
+  if (!btn) return;
+  btn.hidden = !claudeCheck;
+  if (!claudeCheck) return;
+  const k = "n:" + note.path, s = askState(k);
+  btn.setAttribute("aria-expanded", s.open);
+  btn.onclick = () => {
+    s.open = !s.open; btn.setAttribute("aria-expanded", s.open);
+    const node = body.querySelector(`[data-ask="${CSS.escape(k)}"]`); paintAsk(node);
+    if (s.open) node.querySelector("textarea")?.focus({ preventScroll: true });
+  };
+  if (body._askClose) body.removeEventListener("click", body._askClose);  // one handler per reader, for the note shown now
+  body._askClose = e => {
+    if (!e.target.closest("[data-ask-close]")) return;
+    s.open = false; btn.setAttribute("aria-expanded", false);
+    paintAsk(body.querySelector(`[data-ask="${CSS.escape(k)}"]`)); btn.focus();
+  };
+  body.addEventListener("click", body._askClose);
 }
 function askToggleHTML(k) { return `<button type="button" class="btn btn--sm" data-ask-toggle="${esc(k)}" aria-expanded="${askState(k).open}"><svg aria-hidden="true"><use href="#i-ask"/></svg>Ask Claude</button>`; }
 function wireAsks(root) {
@@ -1193,14 +1218,15 @@ function paintAsk(node) {
   node.hidden = !s.open;
   if (!s.open) { node.innerHTML = ""; return; }
   const isNote = k.startsWith("n:");
-  node.innerHTML = `${isNote ? `<h2 class="ask-h">Ask Claude about this note</h2>` : ""}<div class="thread">${s.msgs.map(m => `<div class="msg msg--${m.role}"><p class="meta">${m.role === "user" ? "You" : "Claude " + esc(modelName(m.model))}</p>
+  node.innerHTML = `${isNote ? `<div class="ask-top"><h2 class="ask-h">Ask Claude about this note</h2><button type="button" class="icon-btn" data-ask-close aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>` : ""}<div class="thread">${s.msgs.map(m => `<div class="msg msg--${m.role}"><p class="meta">${m.role === "user" ? "You" : "Claude " + esc(modelName(m.model))}</p>
       <div class="prose">${m.role === "user" ? `<p>${esc(m.text).replace(/\n/g, "<br>")}</p>` : renderMD(m.text)}</div></div>`).join("")}</div>
     ${s.busy ? `<p class="meta" aria-live="polite" style="margin-top:.7rem"><span class="spin" aria-hidden="true"></span> Claude ${esc(modelName(currentModel()))} is thinking…</p>` : ""}
     ${s.err ? `<p class="small" style="margin-top:.6rem"><span class="err">${esc(s.err)}</span></p>` : ""}
     <form class="askform"><label class="sr-only" for="ask-${esc(k)}">Your question for Claude</label>
-      <textarea class="field" id="ask-${esc(k)}" rows="2" placeholder="${s.msgs.length ? "Ask a follow-up" : isNote ? "Ask Claude about this note" : "e.g. Why is my answer wrong?"}">${esc(s.draft)}</textarea>
+      <textarea class="field" id="ask-${esc(k)}" rows="2" placeholder="${esc(tr(s.msgs.length ? "Ask a follow-up" : isNote ? "Ask Claude about this note" : "e.g. Why is my answer wrong?"))}">${esc(s.draft)}</textarea>
       <button class="btn btn--sm btn--mint" type="submit" ${s.busy ? "disabled" : ""}>Ask</button></form>
     ${s.msgs.length ? "" : `<p class="meta note-hint">${isNote ? "Claude reads this note" : "Claude sees the question, your answer and the note section"}. Enter sends, Shift+Enter adds a line.</p>`}`;
+  const th = node.querySelector(".thread"); if (th) th.scrollTop = th.scrollHeight;
   const ta = node.querySelector("textarea");
   ta.oninput = () => { s.draft = ta.value; };
   ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendAsk(k); } };
