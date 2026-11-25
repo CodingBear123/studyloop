@@ -110,7 +110,8 @@ Needs Python 3.9+ (standard library only).
 `/study` and the Studyloop app start it for you. By hand:
 
 ```bash
-python3 skills/study/app/launch.py                       # what the app runs: start if needed, open the browser
+python3 skills/study/app/launch.py                       # what the app runs: start if needed, open a window
+python3 skills/study/app/launch.py --autostart on        # start the server when you log in (off / status)
 python3 skills/study/app/server.py --root ~/path/to/notes  # just the server
 ```
 
@@ -128,9 +129,18 @@ Fable, a specific version such as Opus 4.8, or any other `claude-...` model ID.
 | Written by Claude | Claude, after you say "done" | `studyvault.py record` |
 | Practice round from the bank | the page; open answers by you (against the model answer) or by "Check with Claude" | the server |
 
-Themes: Tide (default), Dark Lab and Soft Garden, switched from the swatches in the header. The theme and the
-model are saved in `~/.config/studyloop/prefs.json` (override with `STUDY_PREFS`), so they stay the
-same on every address and port the page is opened from. Dark Lab and Soft Garden load their fonts from Google Fonts.
+A light and a dark mode, switched with the sun/moon button in the header; until you pick one the page follows
+your system. The mode and the model are saved in `~/.config/studyloop/prefs.json` (override with `STUDY_PREFS`),
+so they stay the same on every address and port the page is opened from. Fonts (Instrument Serif, Instrument
+Sans, JetBrains Mono) ship with the app, so the page looks the same offline.
+
+### As an app
+
+The launcher opens the page in its own window, not a browser tab: the installed Studyloop web app if you have
+one, otherwise Chrome, Edge or Brave in app mode (`--tab` opens a normal tab instead). To install it, open
+http://127.0.0.1:8765/ in Chrome or Edge and choose **Install Studyloop** in the address bar; it then has its own
+Dock / taskbar icon. With `--autostart on` the server is already running when you open it. If it ever isn't,
+the window says so and tells you to run `studyloop`.
 
 ## Updating
 

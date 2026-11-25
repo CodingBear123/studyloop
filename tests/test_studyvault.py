@@ -373,6 +373,36 @@ class ServerTests(unittest.TestCase):
             finally:
                 server.PREFS_FILE = real
 
+    def test_old_themes_become_light(self):
+        self.assertEqual(server.clean_prefs({"theme": "tide"}), {"theme": "light"})
+        self.assertEqual(server.clean_prefs({"theme": "garden"}), {"theme": "light"})
+        self.assertEqual(server.clean_prefs({"theme": "system"}), {"theme": "system"})
+        self.assertEqual(server.clean_prefs({"theme": "neon"}), {})
+
+    def test_autostart_files(self):
+        import launch
+        import plistlib
+        real = launch.AGENT, launch.STARTUP, launch.DESKTOP
+        with tempfile.TemporaryDirectory() as tmp:
+            launch.AGENT, launch.STARTUP, launch.DESKTOP = (Path(tmp) / "a" / "agent.plist", Path(tmp) / "b" / "s.vbs",
+                                                            Path(tmp) / "c" / "s.desktop")
+            try:
+                path = launch.set_autostart(True)
+                self.assertTrue(path.is_file())
+                self.assertTrue(str(path).startswith(tmp))
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("launch.py", text)
+                self.assertIn("--no-browser", text)
+                if path.suffix == ".plist":
+                    plist = plistlib.loads(path.read_bytes())
+                    self.assertTrue(plist["RunAtLoad"])
+                    self.assertEqual(plist["ProgramArguments"][-1], "--no-browser")
+                self.assertEqual(launch.set_autostart(False), path)
+                self.assertFalse(path.exists())
+                launch.set_autostart(False)  # already off: no error
+            finally:
+                launch.AGENT, launch.STARTUP, launch.DESKTOP = real
+
     def test_launcher_remembers_folder(self):
         import launch
         real = server.PREFS_FILE
@@ -440,6 +470,18 @@ class HTTPSecurityTests(unittest.TestCase):
         ok = {"Origin": f"http://127.0.0.1:{self.port}"}
         self.assertEqual(self.req("POST", "/api/note-ref", '{"area": "closures", "question": {}}', ok)[0], 200)
         self.assertEqual(self.req("PUT", "/api/tasks?vault=Course", '{"tasks": []}', ok)[0], 200)
+
+    def test_app_files(self):
+        # what makes it installable: manifest, service worker, icons
+        for path, ctype in (("/manifest.webmanifest", "application/manifest+json"), ("/sw.js", "text/javascript"),
+                            ("/icons/icon-192.png", "image/png"), ("/icons/icon-maskable-512.png", "image/png")):
+            status, body = self.req("GET", path)
+            self.assertEqual(status, 200, path)
+            self.assertTrue(body, path)
+        manifest = json.loads(self.req("GET", "/manifest.webmanifest")[1])
+        self.assertEqual((manifest["name"], manifest["display"]), ("Studyloop", "standalone"))
+        self.assertEqual(self.req("GET", "/icons/nope.png")[0], 404)
+        self.assertEqual(self.req("GET", "/icons/../server.py")[0], 404)
 
     def test_other_websites_are_refused(self):
         # DNS rebinding: a foreign Host can't read anything

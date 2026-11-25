@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open the study page with one click: start the server if it isn't running, then open the browser.
+"""Open Studyloop with one click: start the server if it isn't running, then open it in an app window.
 
 The first time (or with --choose) it asks for the folder that holds your StudyVault(s) and remembers
 it in the prefs file (~/.config/studyloop/prefs.json). Standard library only.
@@ -8,9 +8,12 @@ it in the prefs file (~/.config/studyloop/prefs.json). Standard library only.
     python3 launch.py ~/Notes      # use this folder from now on
     python3 launch.py --choose     # pick another folder
     python3 launch.py --restart    # restart running pages so they load changed code, then open
+    python3 launch.py --tab        # open in a normal browser tab instead of an app window
+    python3 launch.py --autostart on|off   # start the server when you log in (it idles in the background)
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -157,6 +160,109 @@ def start(folder, vaults):
     sys.exit(1)
 
 
+# ---------- app window ----------
+
+def installed_app():
+    """The Studyloop app Chrome or Edge made when you clicked Install (macOS), or None."""
+    if sys.platform != "darwin":
+        return None
+    for folder in ("Chrome Apps.localized", "Edge Apps.localized", "Brave Browser Apps.localized"):
+        app = Path.home() / "Applications" / folder / "Studyloop.app"
+        if app.is_dir():
+            return app
+    return None
+
+
+def chromium():
+    """A Chrome-family browser that can open a page as an app window: (kind, path) or None."""
+    if sys.platform == "darwin":
+        for name in ("Google Chrome", "Microsoft Edge", "Brave Browser", "Chromium"):
+            for root in (Path("/Applications"), Path.home() / "Applications"):
+                if (root / f"{name}.app").is_dir():
+                    return "mac", name
+        return None
+    if os.name == "nt":
+        roots = [os.environ.get(k) for k in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")]
+        rel = [r"Google\Chrome\Application\chrome.exe", r"Microsoft\Edge\Application\msedge.exe",
+               r"BraveSoftware\Brave-Browser\Application\brave.exe"]
+        for r in rel:
+            for root in filter(None, roots):
+                exe = Path(root) / r
+                if exe.is_file():
+                    return "exe", str(exe)
+        return None
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "microsoft-edge", "brave-browser"):
+        exe = shutil.which(name)
+        if exe:
+            return "exe", exe
+    return None
+
+
+def open_window(url, tab=False):
+    """The page in its own window (installed app, or Chrome/Edge --app); a browser tab as the fallback."""
+    if not tab:
+        try:
+            app = installed_app()
+            if app and url.startswith("http://127.0.0.1:8765/"):
+                subprocess.Popen(["open", str(app)])
+                return
+            found = chromium()
+            if found and found[0] == "mac":
+                subprocess.Popen(["open", "-na", found[1], "--args", f"--app={url}"])
+                return
+            if found:
+                kw = {"creationflags": 0x00000008} if os.name == "nt" else {"start_new_session": True}
+                subprocess.Popen([found[1], f"--app={url}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kw)
+                return
+        except OSError:
+            pass
+    webbrowser.open(url)
+
+
+# ---------- start at login ----------
+
+AGENT = Path.home() / "Library" / "LaunchAgents" / "com.studyloop.server.plist"
+STARTUP = Path(os.environ.get("APPDATA") or Path.home()) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Studyloop.vbs"
+DESKTOP = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "autostart" / "studyloop.desktop"
+
+
+def autostart_file():
+    return AGENT if sys.platform == "darwin" else STARTUP if os.name == "nt" else DESKTOP
+
+
+def set_autostart(on):
+    """Start the server (no window) when you log in, or stop doing that. Returns the file it wrote or removed."""
+    path = autostart_file()
+    if not on:
+        if path.exists():
+            path.unlink()
+        return path
+    py, me = sys.executable, str(HERE / "launch.py")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "darwin":
+        log = server.PREFS_FILE.parent / "autostart.log"
+        from xml.sax.saxutils import escape as x
+        path.write_text(f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.studyloop.server</string>
+  <key>ProgramArguments</key><array><string>{x(py)}</string><string>{x(me)}</string><string>--no-browser</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>{x(str(log))}</string>
+  <key>StandardErrorPath</key><string>{x(str(log))}</string>
+</dict></plist>
+""", encoding="utf-8")
+    elif os.name == "nt":
+        pyw = Path(py).with_name("pythonw.exe")
+        exe = str(pyw if pyw.is_file() else py)
+        path.write_text(f'CreateObject("WScript.Shell").Run """{exe}"" ""{me}"" --no-browser", 0, False\r\n',
+                        encoding="utf-8")
+    else:
+        path.write_text(f"[Desktop Entry]\nType=Application\nName=Studyloop\nExec=\"{py}\" \"{me}\" --no-browser\n"
+                        "X-GNOME-Autostart-enabled=true\nNoDisplay=true\n", encoding="utf-8")
+    return path
+
+
 def restart_all():
     """Ask every running study page to restart itself (it keeps its folder and port)."""
     done = []
@@ -181,6 +287,20 @@ def restart_all():
 
 
 def main():
+    if "--autostart" in sys.argv:
+        i = sys.argv.index("--autostart")
+        mode = sys.argv[i + 1] if i + 1 < len(sys.argv) else "status"
+        del sys.argv[i:i + 2]
+        if mode not in ("on", "off", "status"):
+            raise SystemExit("use --autostart on, off or status")
+        if mode == "status":
+            print(f"autostart is {'on' if autostart_file().exists() else 'off'} ({autostart_file()})")
+            return
+        path = set_autostart(mode == "on")
+        print(f"autostart {mode}: {path}")
+        if mode == "off":
+            return
+        sys.argv.append("--no-browser")  # make sure a server runs now too
     if "--restart" in sys.argv:
         restart_all()
 
@@ -190,7 +310,7 @@ def main():
     url = f"http://127.0.0.1:{port}/"
     print(f"Study page: {url}")
     if "--no-browser" not in sys.argv:
-        webbrowser.open(url)
+        open_window(url, tab="--tab" in sys.argv)
 
 
 if __name__ == "__main__":

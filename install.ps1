@@ -114,6 +114,10 @@ foreach ($dir in $places) {
   $lnk.Save()
 }
 Ok "Desktop and Start menu: Studyloop"
+if (Ask "Start Studyloop in the background when you log in (so it opens instantly)?") {
+  & $Py (Join-Path $App "launch.py") --autostart on | Out-Null
+  Ok "starts at login (turn off: run launch.py --autostart off)"
+}
 
 if (Get-Command claude -ErrorAction SilentlyContinue) { Ok "Claude Code" }
 else {

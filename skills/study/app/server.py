@@ -31,6 +31,10 @@ import studyvault as sv  # noqa: E402
 import updater as up  # noqa: E402
 
 FONT_NAMES = {p.name for p in (HERE / "fonts").glob("*.woff2")}
+ICON_NAMES = {p.name for p in (HERE / "icons").glob("*.png")}
+# installable app: manifest and service worker sit next to index.html
+APP_FILES = {"/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+             "/sw.js": ("sw.js", "text/javascript")}
 
 # Open answers on the page: graded by the user (self-check against the model answer) or by a
 # one-off headless Claude Code call (`claude -p`, no tools, no session saved). Nothing runs in
@@ -48,7 +52,8 @@ DEFAULT_MODELS = ALIASES + (
 MODELS = tuple(m.strip() for m in os.environ.get("STUDY_CLAUDE_MODELS", "").split(",") if m.strip()) or DEFAULT_MODELS
 MODEL_ID_RE = re.compile(r"^claude-[a-z0-9][a-z0-9.\-]{0,60}(\[1m\])?$")
 CLAUDE_MODEL = os.environ.get("STUDY_CLAUDE_MODEL", "sonnet")
-THEMES = ("tide", "dark", "garden")
+THEMES = ("light", "dark", "system")
+OLD_THEMES = {"tide": "light", "garden": "light"}  # the three themes before light/dark
 MAX_BODY = 5_000_000  # bytes; the largest legitimate body is a question bank
 # Theme and model live here too, not only in the browser: localStorage is per address, so
 # 127.0.0.1:8765, localhost:8765 and another port would each forget the choice.
@@ -96,8 +101,9 @@ def read_prefs():
 
 def clean_prefs(d):
     out = {}
-    if d.get("theme") in THEMES:
-        out["theme"] = d["theme"]
+    theme = OLD_THEMES.get(d.get("theme"), d.get("theme"))
+    if theme in THEMES:
+        out["theme"] = theme
     if valid_model(d.get("model")):
         out["model"] = d["model"]
     return out
@@ -535,7 +541,8 @@ def make_handler(vaults):
             if isinstance(body, str):
                 body = body.encode("utf-8")
             self.send_response(code)
-            self.send_header("Content-Type", ctype + ("" if ctype.startswith("font/") else "; charset=utf-8"))
+            binary = ctype.startswith(("font/", "image/"))
+            self.send_header("Content-Type", ctype + ("" if binary else "; charset=utf-8"))
             self.send_header("Cache-Control", "max-age=86400" if cache else "no-store")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -591,6 +598,14 @@ def make_handler(vaults):
                     if name in FONT_NAMES:
                         return self.send(200, (HERE / "fonts" / name).read_bytes(), "font/woff2", cache=True)
                     return self.send(404, {"error": "not found"})
+                if method == "GET" and p.startswith("/icons/"):
+                    name = p.rsplit("/", 1)[-1]
+                    if name in ICON_NAMES:
+                        return self.send(200, (HERE / "icons" / name).read_bytes(), "image/png", cache=True)
+                    return self.send(404, {"error": "not found"})
+                if method == "GET" and p in APP_FILES:
+                    name, ctype = APP_FILES[p]
+                    return self.send(200, (HERE / name).read_bytes(), ctype)
                 if method == "GET" and p == "/api/vaults":
                     return self.send(200, [{"id": k, "path": str(a.vault), "subject": a.v.manifest.get("subject"),
                                             "claude_check": bool(CLAUDE), "models": list(MODELS),

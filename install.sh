@@ -118,6 +118,9 @@ Categories=Education;
 EOF
   ok "menu entry: Studyloop"
 fi
+if ask "Start Studyloop in the background when you log in (so the app opens instantly)?"; then
+  "$PY" "$APP/launch.py" --autostart on >/dev/null 2>&1 && ok "starts at login (turn off: studyloop --autostart off)"
+fi
 
 # 5. What the skills need besides Python
 bold "5/5 Checks"
