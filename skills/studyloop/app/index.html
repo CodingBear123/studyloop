@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Studyloop</title>
-<meta name="theme-color" content="#E9E9E8">
+<meta name="theme-color" content="#ECE6DA">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -14,7 +14,7 @@
 <script>
 /* Light or dark before first paint, no flash. The choice is "light", "dark" or "system" (follow the OS). */
 (function () {
-  var BG = { light: "#E9E9E8", dark: "#131313" };
+  var BG = { light: "#ECE6DA", dark: "#1A1714" };
   var media = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
   var pref = "system";
   function resolve(p) { return p === "light" || p === "dark" ? p : (media && media.matches ? "dark" : "light"); }
@@ -55,30 +55,29 @@
 @font-face { font-family: "JetBrains Mono"; src: url(/fonts/jetbrains-mono-latin.woff2) format("woff2"); font-weight: 400 600; font-display: swap; }
 
 :root, [data-theme="light"] {
-  --bg: #E9E9E8; --surface: #F6F6F5; --raised: #DFDFDE; --field: #FBFBFA;
-  --ink: #111111; --ink-2: #474747; --ink-3: #686868;
-  --line: rgba(17, 17, 17, .11); --line-2: rgba(17, 17, 17, .22);
-  --accent: #111111; --accent-text: #111111; --on-accent: #F6F6F5; --accent-soft: rgba(17, 17, 17, .055); --accent-line: rgba(17, 17, 17, .38);
-  --primary: #111111; --on-primary: #F6F6F5; --primary-hover: #2E2E2E;
-  --ok: #3F7559; --ok-soft: rgba(63, 117, 89, .12); --bad: #A04E43; --bad-soft: rgba(160, 78, 67, .12); --warn: #86672A; --warn-soft: rgba(134, 103, 42, .12);
-  --slate: #46627A; --slate-soft: rgba(70, 98, 122, .12); --plum: #74506E; --plum-soft: rgba(116, 80, 110, .12);
-  --lvl1: #D2D2D1; --lvl2: #9C9C9B; --lvl3: #1C1C1C; --lvl3-ink: #F6F6F5;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 12px 32px -18px rgba(0, 0, 0, .18);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .06);
-  --select: rgba(17, 17, 17, .14); --grain: .06;
+  --bg: #ECE6DA; --surface: #F7F3EA; --raised: #E6DFD1; --field: #FBF8F1;
+  --ink: #2A2520; --ink-2: #5A5148; --ink-3: #6A6054;
+  --line: rgba(42, 37, 32, .12); --line-2: rgba(42, 37, 32, .24);
+  --accent: #2A2520; --accent-text: #2A2520; --on-accent: #F7F3EA; --accent-soft: rgba(196, 150, 40, .14); --accent-line: rgba(42, 37, 32, .38);
+  --primary: #2A2520; --on-primary: #F7F3EA; --primary-hover: #453D35;
+  --ok: #44694C; --ok-soft: rgba(68, 105, 76, .12); --bad: #A3483A; --bad-soft: rgba(163, 72, 58, .11); --warn: #7D5F20; --warn-soft: rgba(125, 95, 32, .12);
+  --slate: #4A6175; --slate-soft: rgba(74, 97, 117, .12); --plum: #75506B; --plum-soft: rgba(117, 80, 107, .12);
+  --lvl1: #DDD4C3; --lvl2: #A89C88; --lvl3: #2A2520; --lvl3-ink: #F7F3EA;
+  --shadow: 0 1px 0 rgba(42, 37, 32, .05); --shadow-sm: none;
+  --select: rgba(222, 180, 60, .34); --grain: .08; --edge: rgba(60, 45, 30, .14);
   color-scheme: light;
 }
 [data-theme="dark"] {
-  --bg: #131313; --surface: #1A1A1A; --raised: #242424; --field: #161616;
-  --ink: #E4E4E3; --ink-2: #9B9B9A; --ink-3: #777776;
-  --line: rgba(228, 228, 227, .09); --line-2: rgba(228, 228, 227, .17);
-  --accent: #D6D6D5; --accent-text: #EDEDEC; --on-accent: #131313; --accent-soft: rgba(228, 228, 227, .06); --accent-line: rgba(228, 228, 227, .32);
-  --primary: #E4E4E3; --on-primary: #131313; --primary-hover: #FFFFFF;
-  --ok: #96C2A9; --ok-soft: rgba(150, 194, 169, .11); --bad: #DE978C; --bad-soft: rgba(222, 151, 140, .11); --warn: #D6B87D; --warn-soft: rgba(214, 184, 125, .11);
-  --slate: #9FB8CC; --slate-soft: rgba(159, 184, 204, .11); --plum: #C9A2C2; --plum-soft: rgba(201, 162, 194, .11);
-  --lvl1: #2C2C2C; --lvl2: #555555; --lvl3: #D6D6D5; --lvl3-ink: #131313;
+  --bg: #1A1714; --surface: #221E1A; --raised: #2D2823; --field: #1E1A17;
+  --ink: #E8E0D2; --ink-2: #A99F90; --ink-3: #968C7E;
+  --line: rgba(232, 224, 210, .10); --line-2: rgba(232, 224, 210, .19);
+  --accent: #DCD3C4; --accent-text: #F0E9DC; --on-accent: #1A1714; --accent-soft: rgba(217, 188, 126, .10); --accent-line: rgba(232, 224, 210, .34);
+  --primary: #E8E0D2; --on-primary: #1A1714; --primary-hover: #FFF8EC;
+  --ok: #A3C4A0; --ok-soft: rgba(163, 196, 160, .11); --bad: #E09A8A; --bad-soft: rgba(224, 154, 138, .11); --warn: #D9BC7E; --warn-soft: rgba(217, 188, 126, .11);
+  --slate: #A8BACB; --slate-soft: rgba(168, 186, 203, .11); --plum: #CDA9C4; --plum-soft: rgba(205, 169, 196, .11);
+  --lvl1: #332D27; --lvl2: #5E554B; --lvl3: #DCD3C4; --lvl3-ink: #1A1714;
   --shadow: none; --shadow-sm: none;
-  --select: rgba(228, 228, 227, .18); --grain: .045;
+  --select: rgba(217, 188, 126, .26); --grain: .055; --edge: rgba(0, 0, 0, .45);
   color-scheme: dark;
 }
 :root {
@@ -110,7 +109,9 @@ button { cursor: pointer; }
 svg { flex: none; }
 
 /* ---------- primitives ---------- */
-.block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: var(--pad); }
+/* a sheet of paper: tight corners, a hairline, and a second sheet lying just under the first */
+.block { background: var(--surface); border: 1px solid var(--line-2); border-radius: 6px; padding: var(--pad);
+  box-shadow: 0 1px 1px var(--edge), 4px 4px 0 -1px var(--surface), 4px 4px 0 0 var(--line-2), 7px 8px 14px -8px var(--edge); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: var(--r);
   background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); font-weight: 500; font-size: .9375rem; white-space: nowrap;
   transition: background-color var(--fast) var(--ease), border-color var(--fast) var(--ease), color var(--fast) var(--ease), transform var(--fast) var(--ease); }
@@ -248,7 +249,7 @@ code { font-family: var(--mono); font-size: .875em; background: var(--raised); p
 .katex { font-size: 1.1em; }
 pre { margin: 16px 0; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); overflow-x: auto; }
 [data-theme="dark"] pre { background: var(--raised); }
-[data-theme="light"] pre { background: #FBFBFA; }
+[data-theme="light"] pre { background: var(--field); }
 pre code, pre code.hljs { display: block; padding: 12px 16px; background: transparent !important; font-size: .8125rem; line-height: 1.65; white-space: pre; tab-size: 4; border-radius: 0; }
 .opts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 20px; }
 .opt { position: relative; display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--line-2); border-radius: var(--r); background: transparent; padding: 12px; cursor: pointer;
@@ -484,6 +485,7 @@ img.embed { display: block; margin: .5rem 0; }
 /* ---------- ask Claude ---------- */
 .qfoot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 16px; }
 .ask { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+.ask--dock { border-radius: 6px; border-color: var(--line-2); }
 .ask .thread { display: grid; gap: 12px; }
 .ask .thread:empty { display: none; }
 .msg { padding: 10px 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); }

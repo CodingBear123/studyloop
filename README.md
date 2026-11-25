@@ -238,7 +238,8 @@ installed and signed in. The **Claude** picker in the header chooses the model (
 Fable, a specific version, or any `claude-...` model ID).
 
 **Look.** One light mode and one dark mode, switched with the sun/moon button; until you pick one the page
-follows your system. Your choice and model are saved in `~/.config/studyloop/prefs.json`.
+follows your system. Both are warm paper and brown ink: cream sheets by day, charcoal at night. Your choice
+and model are saved in `~/.config/studyloop/prefs.json`.
 
 **As an app.** The page opens in its own window, not a browser tab: the installed Studyloop app if you have
 one, otherwise Chrome, Edge or Brave in app mode. To install it, open http://127.0.0.1:8765/ in Chrome or
