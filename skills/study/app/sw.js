@@ -1,7 +1,7 @@
 /* Studyloop service worker. The page and its data always come from the local server; this only keeps
    the shell (fonts, icons, last page) so that, when the server isn't running, the app window shows how
    to start it instead of the browser's error page. */
-const CACHE = "studyloop-v2";
+const CACHE = "studyloop-v3";
 const SHELL = ["/fonts/instrument-sans-latin.woff2", "/fonts/instrument-serif-latin.woff2",
   "/fonts/jetbrains-mono-latin.woff2", "/icons/icon-192.png"];
 
@@ -18,7 +18,7 @@ const OFFLINE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><met
 @font-face { font-family: "Instrument Serif"; src: url(/fonts/instrument-serif-latin.woff2) format("woff2"); }
 @font-face { font-family: "Instrument Sans"; src: url(/fonts/instrument-sans-latin.woff2) format("woff2"); font-weight: 400 700; }
 :root { color-scheme: light dark; --bg: #E9E9E8; --ink: #111111; --ink-2: #474747; --line: rgba(17,17,17,.12); }
-@media (prefers-color-scheme: dark) { :root { --bg: #0A0A0A; --ink: #E4E4E3; --ink-2: #9B9B9A; --line: rgba(228,228,227,.1); } }
+@media (prefers-color-scheme: dark) { :root { --bg: #131313; --ink: #E4E4E3; --ink-2: #9B9B9A; --line: rgba(228,228,227,.1); } }
 body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink); font: 16px/1.5 "Instrument Sans", system-ui, sans-serif; }
 main { max-width: 30rem; padding: 32px; }
 h1 { font: 400 2.5rem/1.1 "Instrument Serif", Georgia, serif; margin: 0 0 12px; }
