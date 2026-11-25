@@ -1,20 +1,20 @@
 ---
-name: study-vault
+name: studyloop-setup
 description: >
   Build or update an Obsidian StudyVault from course material (lecture slides, PDFs, notes, old exams)
   for studyloop. Use when the user wants to turn course files into study notes, add new
   lecture material to an existing vault, convert an older /tutor-setup vault, or check a vault for
-  broken data. Triggers: "/study-vault", "make a study vault", "set up my notes for studying",
-  "add session 12 to my vault". Quizzing is /study.
+  broken data. Triggers: "/studyloop-setup", "make a study vault", "set up my notes for studying",
+  "add session 12 to my vault". Quizzing is /studyloop.
 ---
 
-# /study-vault
+# /studyloop-setup
 
-Turn course material into a StudyVault that `/study` can quiz from: notes per area, an exam blueprint, practice
+Turn course material into a StudyVault that `/studyloop` can quiz from: notes per area, an exam blueprint, practice
 files, a seeded question bank and empty trackers, all registered in `studyvault.json`.
 
-Needs the `study` skill installed next to this one: `TOOL` below means `../study/app/studyvault.py`
-(relative to this file) and the vault format is `../study/references/studyvault-spec.md`. Read the spec first.
+Needs the `study` skill installed next to this one: `TOOL` below means `../studyloop/app/studyvault.py`
+(relative to this file) and the vault format is `../studyloop/references/studyvault-spec.md`. Read the spec first.
 
 ## Pick the mode
 
@@ -65,7 +65,7 @@ extra folders (e.g. `11-Past-Exams`) to the manifest by hand afterwards. Pass `-
 material (German structure words in trackers and dashboard).
 
 Optional: list each area's key concepts in its tracker as untested rows (`| name | 0 | 0 | - | untested |`), so
-`/study` can run diagnostics concept by concept. This is the only time a tracker is written by hand; run
+`/studyloop` can run diagnostics concept by concept. This is the only time a tracker is written by hand; run
 `check` afterwards.
 
 ### 4. Notes (per area, in its folder)
@@ -84,11 +84,11 @@ Follow `references/templates.md`:
 - One `NN Practice - <Title>.md` per area folder, 8+ questions, answers in `> [!answer]- Answer` folds,
   tagged `[recall]` / `[application]` / `[analysis]` (≥60% recall, ≥20% application, ≥2 analysis).
   Use old exam questions where they fit, with their source.
-- Seed `question-bank/<slug>.json` with 6–10 questions per area in the format of `../study/references/app.md`:
+- Seed `question-bank/<slug>.json` with 6–10 questions per area in the format of `../studyloop/references/app.md`:
   every question has `id` (`<prefix>-001`), `concept`, `type`, `difficulty`, `explanation`; use the types the old
   exams use (`single`, `multi`, `kprim`, `numeric`, `open`, see `quiz-rules.md`); every type but open has
   `answer`, open has `model_answer`; give `ref` (`"Note title#Heading"`) for the section that answers it.
-  Follow `../study/references/quiz-rules.md`. These power the page's
+  Follow `../studyloop/references/quiz-rules.md`. These power the page's
   practice rounds, so they must be correct: double-check every answer key, and run code you put in questions
   when you can.
 
@@ -104,7 +104,7 @@ exam with the questions, the answers, and links to the notes that cover each que
    siblings ↔ siblings.
 2. Run `python3 TOOL recompute VAULT` and `python3 TOOL check VAULT`. Fix every error and every broken link.
 3. Go through `references/checklist.md`. Then report: areas, note and question counts, what is out of scope,
-   and "run `/study` to start".
+   and "run `/studyloop` to start".
 
 ## Update
 

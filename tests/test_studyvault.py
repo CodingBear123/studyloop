@@ -3,12 +3,13 @@
     python3 -m unittest discover -s tests
 """
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-APP = Path(__file__).resolve().parent.parent / "skills" / "study" / "app"
+APP = Path(__file__).resolve().parent.parent / "skills" / "studyloop" / "app"
 sys.path.insert(0, str(APP))
 import studyvault as sv  # noqa: E402
 import server  # noqa: E402
@@ -523,7 +524,7 @@ class UpdaterTests(unittest.TestCase):
         for name in ("mine", "other"):
             subprocess.run(["git", "clone", "-q", str(t / "origin.git"), str(t / name)], check=True, capture_output=True)
         self.mine, self.other = t / "mine", t / "other"
-        self.commit(self.other, "skills/study/SKILL.md", "v1", "first")
+        self.commit(self.other, "skills/studyloop/SKILL.md", "v1", "first")
         self.g(self.other, "push", "-q", "origin", "HEAD:main")
         self.g(self.mine, "pull", "-q", "origin", "main")
         self.g(self.mine, "branch", "-q", "--set-upstream-to=origin/main")
@@ -541,22 +542,22 @@ class UpdaterTests(unittest.TestCase):
 
     def test_finds_and_pulls_an_update(self):
         self.assertFalse(self.up.status(force=True)["available"])
-        self.commit(self.other, "skills/study/SKILL.md", "v2", "Better hints")
+        self.commit(self.other, "skills/studyloop/SKILL.md", "v2", "Better hints")
         self.g(self.other, "push", "-q", "origin", "HEAD:main")
         st = self.up.status(force=True)
         self.assertEqual((st["behind"], st["can_update"], st["changes"]), (1, True, ["Better hints"]))
         self.up.apply()
-        self.assertEqual((self.mine / "skills/study/SKILL.md").read_text(), "v2")
+        self.assertEqual((self.mine / "skills/studyloop/SKILL.md").read_text(), "v2")
         self.assertFalse(self.up.status(force=True)["available"])
 
     def test_local_edits_are_not_overwritten(self):
-        self.commit(self.other, "skills/study/SKILL.md", "v2", "theirs")
+        self.commit(self.other, "skills/studyloop/SKILL.md", "v2", "theirs")
         self.g(self.other, "push", "-q", "origin", "HEAD:main")
-        (self.mine / "skills/study/SKILL.md").write_text("my edit")
+        (self.mine / "skills/studyloop/SKILL.md").write_text("my edit")
         self.assertTrue(self.up.status(force=True)["local_changes"])
         with self.assertRaisesRegex(ValueError, "your own changes|Your own changes"):
             self.up.apply()
-        self.assertEqual((self.mine / "skills/study/SKILL.md").read_text(), "my edit")
+        self.assertEqual((self.mine / "skills/studyloop/SKILL.md").read_text(), "my edit")
 
     def test_not_a_git_checkout(self):
         self.up.REPO = Path(self.tmp.name) / "plain"
@@ -566,15 +567,31 @@ class UpdaterTests(unittest.TestCase):
 
     def test_windows_skill_copies_are_refreshed(self):
         home = Path(self.tmp.name) / "home"
-        ours, theirs = home / ".claude/skills/study", home / ".claude/skills/study-vault"
+        ours, theirs = home / ".claude/skills/studyloop", home / ".claude/skills/studyloop-setup"
         ours.mkdir(parents=True)
         (ours / ".claude-study-tool").write_text("old marker")
         theirs.mkdir(parents=True)
         (theirs / "SKILL.md").write_text("someone else's")
-        self.assertEqual(self.up.refresh_copies(home), ["study"])
+        self.assertEqual(self.up.refresh_copies(home), ["studyloop"])
         self.assertEqual((ours / "SKILL.md").read_text(), "v1")
         self.assertTrue((ours / ".studyloop").exists())
         self.assertEqual((theirs / "SKILL.md").read_text(), "someone else's")
+
+    def test_old_skill_names_move_to_new_ones(self):
+        home = Path(self.tmp.name) / "home"
+        skills = home / ".claude/skills"
+        skills.mkdir(parents=True)
+        (skills / "study").symlink_to(self.mine / "skills" / "study")          # Mac link, dangling after the pull
+        copy = skills / "study-vault"                                           # Windows copy of ours
+        copy.mkdir()
+        (copy / ".studyloop").write_text("ours")
+        (skills / "other").symlink_to(self.mine)                               # someone else's link stays
+        self.assertEqual(sorted(self.up.rename_old(home)), ["study", "study-vault"])
+        self.assertFalse((skills / "study").is_symlink())
+        self.assertEqual(Path(os.readlink(skills / "studyloop")), self.mine / "skills" / "studyloop")
+        self.assertFalse(copy.exists())
+        self.assertTrue((skills / "studyloop-setup").is_dir())
+        self.assertTrue((skills / "other").is_symlink())
 
 
 class StatusWordTests(unittest.TestCase):

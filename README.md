@@ -1,76 +1,90 @@
 # Studyloop
 
-Two agent skills and a local quiz page for studying from a **StudyVault**, a folder of Markdown notes that
-also opens as an Obsidian vault.
+Turn your course material into study notes, then let Claude quiz you on them until the gaps are gone.
 
-| Command | What it does |
-|---|---|
-| `/study-vault` | Builds a StudyVault from your course material (slides, PDFs, old exams): notes per area, exam blueprint, practice files, a seeded question bank, empty trackers. Also updates a vault with new material, migrates an older `/tutor-setup` vault, and checks a vault for broken data. |
-| `/study` | Quizzes you from the vault: diagnostic, drill weak areas, one area, exam simulation, or a timed study plan. Rounds open in the local page (code keeps its indentation), Claude grades them and records the result. Also answers "how am I doing". |
+Studyloop is two commands for [Claude Code](https://claude.com/claude-code) plus a small study page that runs
+on your own computer:
 
-Both write vault data only through `skills/study/app/studyvault.py`, so the trackers, dashboard and question
-bank never drift apart. `studyvault.py check` proves it.
+- **`/studyloop-setup`** reads your slides, PDFs and old exams and writes a **StudyVault**: a folder of clear
+  notes per topic, an exam blueprint, practice questions and a question bank.
+- **`/studyloop`** quizzes you from that vault, grades your answers, and remembers every concept you got wrong,
+  so the next round goes after exactly those.
+- **The study page** is where you answer, read your notes, see your progress and practise on your own, with
+  or without Claude.
+
+Everything stays on your machine as plain Markdown and JSON. The vault also opens in
+[Obsidian](https://obsidian.md) if you use it.
+
+> Studyloop is a work in progress. It is used every day for real exams, but things still change often.
+
+---
+
+## Contents
+
+- [How it works](#how-it-works)
+- [Install](#install)
+- [Commands in Claude Code](#commands-in-claude-code)
+  - [`/studyloop-setup`: build your notes](#studyloop-setup-build-your-notes)
+  - [`/studyloop`: get quizzed](#studyloop-get-quizzed)
+  - [What you can say](#what-you-can-say)
+- [The study page](#the-study-page)
+- [The `studyloop` command](#the-studyloop-command)
+- [Updating](#updating)
+- [Your data](#your-data)
+- [Working on Studyloop](#working-on-studyloop)
+
+---
 
 ## How it works
 
 ```
-  Course material                 StudyVault/                        Study page
-                                                                  (local website)
-+------------------+         +--------------------+         +--------------------------+
-| slides, PDFs,    | /study- | notes per area,    | reads   | Quiz: answer rounds      |
-| old exams,       |-------->| question bank,     |<------->| Notes: read, Ask Claude  |
-| your notes       |  vault  | concept trackers,  | saves   | Progress                 |
-|                  |         | rounds, results    |         | Question bank: edit      |
-+------------------+         +--------------------+         +--------------------------+
-                                        ^                                 |
-                                        | /study: writes                  | checks open
-                                        | rounds, grades,                 | answers,
-                                        | records                         | Ask Claude
-                             +--------------------+                       |
-                             |    Claude Code     |<----------------------+
-                             +--------------------+
+   your course folder              StudyVault/                     study page
+                                                               127.0.0.1:8765
+ +------------------+         +------------------+         +--------------------+
+ | slides, PDFs,    | /study- | notes per area   |  reads  | Quiz               |
+ | old exams,       |-------->| question bank    |<------->| Notes              |
+ | your own notes   |  vault  | concept trackers |  saves  | Progress           |
+ +------------------+         +------------------+         | Question bank      |
+                                       ^                   +--------------------+
+                                       |  /studyloop: writes rounds,      |
+                                       |  grades, records             | "Ask Claude",
+                              +------------------+                    | "Check with Claude"
+                              |   Claude Code    |<-------------------+
+                              +------------------+
 ```
 
-1. **Build the vault.** In Claude Code, open your course folder and type `/study-vault`. Claude reads your
-   slides, PDFs and old exams and writes a `StudyVault/`: one folder of notes per topic area, an exam blueprint
-   (what the exam asks and how), practice questions, a question bank and an empty concept tracker per area.
-   Old exams decide how you get asked, not what: the scope is what your course material covers.
-2. **Study.** Type `/study`. Claude picks a session from your progress (diagnostic, drill your weak spots,
-   one area, exam simulation, or a timed plan) and writes a round. You answer it on the **study page**: a small
-   website that runs only on your computer (`http://127.0.0.1:8765`) and reads and saves the vault directly.
-   Code keeps its indentation there and formulas render. Open it any time with the Studyloop app, also
-   without Claude: practice rounds from the question bank, your notes, your progress.
-3. **Track.** Claude grades the round, explains every miss with a link to the note section to reread, and
-   records each answer in the concept tracker: `open` concepts you got wrong, `solved` once you get them right. The next
-   round targets the open ones. Practice rounds you start on the page are graded by the page and recorded the
-   same way; for open answers it can ask Claude for a check, and every question and note has an "Ask Claude"
-   button. (The page calls Claude Code in the background for these, so they need it installed and signed in.)
+The loop has three steps:
 
-The vault is plain Markdown, so you can also read and edit it in [Obsidian](https://obsidian.md) or any editor.
+1. **Build once.** `/studyloop-setup` turns your material into a StudyVault. The rule it follows: *your course
+   material decides what is in scope; old exams only show how it gets asked.*
+2. **Quiz.** `/studyloop` picks what to practise from your progress, writes a round of questions, and opens it on
+   the study page. Code keeps its indentation there and formulas render properly.
+3. **Track.** Claude grades the round, explains every miss with a link to the note section to reread, and
+   records each concept as `open` (got it wrong) or `solved` (got it right since). The next round goes after the
+   open ones. Repeat until nothing is open.
+
+---
 
 ## Install
 
-You need [Claude Code](https://claude.com/claude-code) (the installer offers to set it up) and a Claude
-account. Everything else the installer checks and sets up for you.
-
-[Obsidian](https://obsidian.md) is optional. The vault is ordinary Markdown, and the study page shows the notes
-itself. If you like Obsidian, open the folder that contains `StudyVault/` as a vault there.
+You need [Claude Code](https://claude.com/claude-code) and a Claude account. The installer checks everything
+else (Python 3.9+, and `pdftotext` for reading PDF slides) and offers to set it up.
 
 **Mac**
 
 1. On GitHub, click **Code → Download ZIP** and open the ZIP (or `git clone` the repository).
-2. In the unpacked folder, right-click **Install on Mac.command** → **Open** → **Open**. (Right-click only the
-   first time: macOS doesn't open downloaded scripts on a plain double-click.)
-3. Follow the window. If Python is missing, macOS offers to install it; afterwards run step 2 again.
+2. In the unpacked folder, right-click **Install on Mac.command** → **Open** → **Open**. Right-click is only
+   needed the first time: macOS doesn't open downloaded scripts on a plain double-click.
+3. Follow the window. If Python is missing, macOS offers to install it; run step 2 again afterwards.
 
 **Windows**
 
-1. On GitHub, click **Code → Download ZIP**, right-click it → **Extract All**.
+1. On GitHub, click **Code → Download ZIP**, then right-click it → **Extract All**.
 2. In the extracted folder, double-click **Install on Windows.cmd**. If Windows shows "Windows protected your
    PC", click **More info → Run anyway**.
-3. Follow the window. It installs Python with winget when it's missing.
+3. Follow the window. It installs Python with winget if it's missing.
 
-**Terminal, one line** (works only while the repository is public):
+**Terminal, one line** (only while the repository is public)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/CodingBear123/studyloop/main/install.sh | sh
@@ -80,120 +94,230 @@ curl -fsSL https://raw.githubusercontent.com/CodingBear123/studyloop/main/instal
 irm https://raw.githubusercontent.com/CodingBear123/studyloop/main/install.ps1 | iex
 ```
 
-The installer puts `/study` and `/study-vault` into `~/.claude/skills` (a link on Mac/Linux, a copy on
-Windows), adds a **Studyloop** app (Mac: `~/Applications`, Spotlight, optional Desktop shortcut; Windows:
-Desktop and Start menu; Linux: app menu) and a `studyloop` terminal command, and offers `pdftotext` for
-reading PDF slides. It installs with git when git is there, so the page can update itself (see
-[Updating](#updating)); otherwise run it again to update. A copy installed under the old name (Claude Study)
-is moved over and the old app and command are removed.
+**What the installer sets up**
 
-Other ways, for agents besides Claude Code or for development:
+| | |
+|---|---|
+| `/studyloop` and `/studyloop-setup` | in `~/.claude/skills` (a link on Mac and Linux, a copy on Windows) |
+| **Studyloop** app | Mac: `~/Applications`, Spotlight, optional Desktop shortcut. Windows: Desktop and Start menu. Linux: app menu |
+| `studyloop` command | Mac and Linux, in `~/.local/bin` |
+| Start at login (optional) | the study page is already running when you open it |
+
+It installs with git when git is available, so the page can update itself later. Run the installer again at
+any time; it updates what is there.
+
+<details>
+<summary>Other ways to install (other agents, development)</summary>
 
 ```bash
 npx skills add CodingBear123/studyloop                  # any agent that reads Agent Skills
 claude plugin marketplace add CodingBear123/studyloop && claude plugin install studyloop@studyloop
-ln -s "$PWD/skills/study" ~/.claude/skills/study        # from a clone: edits go live
-ln -s "$PWD/skills/study-vault" ~/.claude/skills/study-vault
+ln -s "$PWD/skills/studyloop" ~/.claude/skills/studyloop        # from a clone: your edits go live
+ln -s "$PWD/skills/studyloop-setup" ~/.claude/skills/studyloop-setup
 ```
 
-Needs Python 3.9+ (standard library only).
+</details>
 
-## Use it
+---
 
-1. Open Claude Code in the folder with your course material and type `/study-vault`. It builds a
-   `StudyVault` folder with your notes.
-2. To study, type `/study`, or open the **Studyloop** app. The first time, the app asks for the folder
-   that holds your StudyVault and remembers it (pick another one with `studyloop --choose`).
+## Commands in Claude Code
 
-## The page
+Open Claude Code **in your course folder** (the folder with your slides, or the one that holds your
+`StudyVault/`), then type one of these:
 
-`/study` and the Studyloop app start it for you. By hand:
+| Command | Use it to | You get |
+|---|---|---|
+| `/studyloop-setup` | turn course material into notes, add new material, repair a vault | a `StudyVault/` folder |
+| `/studyloop` | get quizzed, drill weak spots, follow a study plan, check progress | a round on the study page, graded and tracked |
 
-```bash
-python3 skills/study/app/launch.py                       # what the app runs: start if needed, open a window
-python3 skills/study/app/launch.py --autostart on        # start the server when you log in (off / status)
-python3 skills/study/app/server.py --root ~/path/to/notes  # just the server
-```
+You can type the command alone and Claude asks what you want, or add what you want right after it:
+`/studyloop drill my weak areas`. Plain sentences work too ("quiz me on closures"), but the command is the
+surest way to start the right skill. Claude answers in the language you write in.
 
-Open http://127.0.0.1:8765/. Tabs: **Quiz** (Claude's round, practice rounds from the bank, To do list),
-**Notes** (the vault's notes, readable on the page), **Progress** (rate per area, open concepts with error
-notes, daily streak), **Question bank** (editor).
+### `/studyloop-setup`: build your notes
 
-After grading, each question links to the note section that covers it, and **Ask Claude** answers follow-up
-questions about it (also at the end of every note). Checks and questions are one-off `claude -p` calls
-with no tools; the **Claude** picker in the header chooses the model: the newest Sonnet, Opus, Haiku or
-Fable, a specific version such as Opus 4.8, or any other `claude-...` model ID.
+Run it in the folder with your course files. It picks one of four modes from what it finds:
+
+| Mode | When | Example |
+|---|---|---|
+| **Create** | there is no `StudyVault/` yet | `/studyloop-setup` |
+| **Update** | you have new material | `/studyloop-setup add the slides from session 12` |
+| **Migrate** | an older vault from `/tutor-setup` or made by hand | `/studyloop-setup convert my old vault` |
+| **Check** | something looks off | `/studyloop-setup check my vault` |
+
+What happens on **Create**, and where Claude stops to ask you:
+
+1. **Sources.** Claude lists the files it found and asks which are course material and which are old
+   exams. It reads what each file really covers (file names often lie) and shows you that map.
+2. **Scope and exam.** It agrees the scope with you and, if there are old exams, analyses them: question
+   types, points, which topics come up every year. That becomes `00-Dashboard/Exam Blueprint.md`. It asks for
+   the exam date and format if you know them.
+3. **Areas.** It proposes 6–12 topic areas in course order and waits for your yes.
+4. **Notes.** One folder per area with 2–5 notes each: tables, worked examples, real code, warnings for every
+   exception to a rule, and an "Exam Patterns" section in each note.
+5. **Practice and bank.** A practice file per area and a seeded question bank, so you can practise on the
+   page right away.
+6. **Check.** It validates the vault and reports.
+
+Claude only reads files inside the current folder, and it never deletes or rewrites your tracking data.
+
+### `/studyloop`: get quizzed
+
+Run it in the folder that holds your `StudyVault/` (or a folder above it). Claude reads your progress and
+suggests a session, or you name one:
+
+| Session | What Claude does | Example |
+|---|---|---|
+| **Diagnostic** | one question per untested area or concept, to find where you stand | `/studyloop` (the default on a new vault) |
+| **Drill** | your open concepts again, rephrased in new contexts | `/studyloop drill my weak spots` |
+| **Area** | four questions on one topic | `/studyloop quiz me on persistence` |
+| **Exam simulation** | a mixed round in the shape of the real exam, open questions included | `/studyloop exam simulation` |
+| **Study plan** | splits your time into ~20-minute blocks weighted by exam weight × weakness, then runs them | `/studyloop I have 2 hours` |
+| **Progress** | a report from your trackers, no questions | `/studyloop how am I doing?` |
+
+**One round, step by step**
+
+1. Claude writes the round (usually 4 questions: single choice, multiple choice, true/false grids, numbers,
+   open answers) and gives you a link to the study page, or opens it.
+2. You answer on the page and click **Submit answers**.
+3. You type **`done`** in Claude Code.
+4. Claude grades the round: a table of right and wrong, then a short explanation for each miss with the note
+   to reread.
+5. Claude records the result. Open concepts you now got right become `solved`; solved ones you get wrong
+   again go back to `open`.
+6. Claude offers to save good questions to the question bank, so you can practise them later without Claude.
+
+If you submitted a round and never said `done`, the next `/studyloop` grades it first.
+
+### What you can say
+
+You don't need exact wording. Some things that work:
+
+| You say | Claude |
+|---|---|
+| `/studyloop-setup` | builds a vault from the files in this folder |
+| `/studyloop-setup add lecture 9 and the 2024 exam` | updates the vault with the new material |
+| `/studyloop-setup is my vault ok?` | checks it and fixes broken data |
+| `/studyloop` | suggests a session from your progress |
+| `/studyloop test me on recursion, hard questions` | one area, harder round |
+| `/studyloop only open questions` | a round of written answers |
+| `/studyloop exam in 3 days, make a plan` | a study plan you work through block by block |
+| `done` | grades the round you just submitted |
+| `explain question 3 again` | goes deeper on one answer |
+| `/studyloop how am I doing?` | your rates per area and what is still open |
+
+---
+
+## The study page
+
+Open the **Studyloop** app (or run `studyloop`). The first time it asks for the folder that holds your
+StudyVault and remembers it. Everything below works **without** Claude Code open, except the buttons that
+ask Claude.
+
+| Tab | What's there |
+|---|---|
+| **Quiz** | the round Claude wrote, practice rounds from the question bank (pick areas and question types), your to-do list |
+| **Notes** | every note in the vault, readable and searchable, with an **Ask Claude** box at the end of each note |
+| **Progress** | overall rate, rate per area, open concepts with what you mixed up, a daily streak |
+| **Question bank** | add, edit and delete bank questions per area |
+
+**Who grades what**
 
 | Round | Graded by | Recorded by |
 |---|---|---|
-| Written by Claude | Claude, after you say "done" | `studyvault.py record` |
-| Practice round from the bank | the page; open answers by you (against the model answer) or by "Check with Claude" | the server |
+| Written by Claude (`/studyloop`) | Claude, after you type `done` | Claude |
+| Practice round from the bank | the page; open answers by you against the model answer, or by **Check with Claude** | the page |
 
-A light and a dark mode, switched with the sun/moon button in the header; until you pick one the page follows
-your system. The mode and the model are saved in `~/.config/studyloop/prefs.json` (override with `STUDY_PREFS`),
-so they stay the same on every address and port the page is opened from. Fonts (Instrument Serif, Instrument
-Sans, JetBrains Mono) ship with the app, so the page looks the same offline.
+After grading, every question links to the note section that covers it, and **Ask Claude** answers follow-up
+questions about it. These buttons run a one-off Claude Code call in the background, so they need Claude Code
+installed and signed in. The **Claude** picker in the header chooses the model (newest Sonnet, Opus, Haiku or
+Fable, a specific version, or any `claude-...` model ID).
 
-### As an app
+**Look.** One light mode and one dark mode, switched with the sun/moon button; until you pick one the page
+follows your system. Your choice and model are saved in `~/.config/studyloop/prefs.json`.
 
-The launcher opens the page in its own window, not a browser tab: the installed Studyloop web app if you have
-one, otherwise Chrome, Edge or Brave in app mode (`--tab` opens a normal tab instead). To install it, open
-http://127.0.0.1:8765/ in Chrome or Edge and choose **Install Studyloop** in the address bar; it then has its own
-Dock / taskbar icon. With `--autostart on` the server is already running when you open it. If it ever isn't,
-the window says so and tells you to run `studyloop`.
+**As an app.** The page opens in its own window, not a browser tab: the installed Studyloop app if you have
+one, otherwise Chrome, Edge or Brave in app mode. To install it, open http://127.0.0.1:8765/ in Chrome or
+Edge and choose **Install Studyloop** in the address bar; it then gets its own Dock or taskbar icon. If the
+page isn't running, the window says so and tells you to run `studyloop`.
+
+---
+
+## The `studyloop` command
+
+The Studyloop app runs this too.
+
+| Command | What it does |
+|---|---|
+| `studyloop` | start the page if needed and open it |
+| `studyloop ~/path/to/notes` | use this folder from now on |
+| `studyloop --choose` | pick another folder |
+| `studyloop --tab` | open in a normal browser tab instead of an app window |
+| `studyloop --autostart on` | start the page in the background at login (`off`, `status`) |
+| `studyloop --restart` | restart running pages so they load changed code |
+
+On Windows, or without the command on your PATH, run the launcher with the same options:
+`python3 skills/studyloop/app/launch.py` (Windows: `py skills\studyloop\app\launch.py`).
+
+---
 
 ## Updating
 
-When GitHub has a newer version, an **Update Studyloop** button shows up in the page header (hover it to see
-what changed). It runs `git pull --ff-only` in the install folder, copies the skills again on Windows, and
-restarts the page, which reloads itself. Your vaults aren't touched. The page checks at most once an hour.
+When GitHub has a newer version, an **Update Studyloop** button appears in the page header (hover it to see
+what changed). One click pulls the update, refreshes the skills, and restarts the page. Your vaults are never
+touched. The page checks at most once an hour.
 
-It needs a git checkout (what the installers make when git is installed). If you changed Studyloop's own
-files, the button says so instead of overwriting them: commit or stash first. Without git, run the
-installer again.
+This needs a git checkout, which the installer makes when git is installed. If you changed Studyloop's own
+files, the button says so instead of overwriting them. Without git, run the installer again.
 
-## Working on Studyloop
+---
 
-No reinstall needed. On Mac and Linux `~/.claude/skills/study` and `study-vault` are links into the folder
-you installed from, so edits to `SKILL.md`, the references and `studyvault.py` count from the next `/study`.
-The page is a running server, so after changing `server.py`, `notes.py`, `studyvault.py` or `updater.py`:
-
-```bash
-studyloop --restart      # or: python3 skills/study/app/launch.py --restart
-```
-
-That restarts every open study page on its own port, then opens it. A plain reload is enough for
-`index.html`. On Windows the skills are copies: run `install.ps1` from your clone again after editing them.
-
-## The vault
+## Your data
 
 ```
 StudyVault/
-  studyvault.json        areas (slug, title, folder), subject, scope, exam
-  Learning Dashboard.md  generated from concepts/
-  00-Dashboard/          MOC, Exam Blueprint, Quick Reference, Exam Traps
-  01-…/ 02-…/            notes + one practice file per area
-  concepts/<slug>.md     concept tracker per area
-  question-bank/<slug>.json, rounds/, results/
-  tasks.json             study plan / to-do list
+  studyvault.json          areas, subject, scope, exam date
+  Learning Dashboard.md    your rates per area (generated)
+  00-Dashboard/            map of contents, Exam Blueprint, Quick Reference, Exam Traps
+  01-…/ 02-…/              notes and one practice file per area
+  concepts/<area>.md       concept tracker: every concept, attempts, open or solved, what you mixed up
+  question-bank/           questions per area, plus rounds/ and results/
+  tasks.json               study plan and to-do list
 ```
 
-Full format: [skills/study/references/studyvault-spec.md](skills/study/references/studyvault-spec.md).
+Read and edit the **notes** however you like, in Obsidian or any editor. Leave the **trackers, dashboard
+and results** to Studyloop: every change to them goes through one script, so they never drift apart. If
+something looks wrong, run `/studyloop-setup check my vault`, or by hand:
 
 ```bash
-python3 skills/study/app/studyvault.py check   path/to/StudyVault   # validate everything
-python3 skills/study/app/studyvault.py status  path/to/StudyVault   # summary JSON
-python3 skills/study/app/studyvault.py migrate path/to/StudyVault --write   # older /tutor vault
+python3 skills/studyloop/app/studyvault.py check  path/to/StudyVault   # find problems
+python3 skills/studyloop/app/studyvault.py status path/to/StudyVault   # summary as JSON
 ```
 
-## Tests
+Full format: [studyvault-spec.md](skills/studyloop/references/studyvault-spec.md).
+
+---
+
+## Working on Studyloop
+
+On Mac and Linux the installed skills are links into the folder you installed from, so edits to `SKILL.md`,
+the references and `studyvault.py` count from the next `/studyloop`. On Windows they are copies: run
+`install.ps1` again after editing.
+
+| You changed | Then |
+|---|---|
+| `index.html` | reload the page |
+| `server.py`, `notes.py`, `studyvault.py`, `updater.py` | `studyloop --restart` |
 
 ```bash
-python3 -m unittest discover -s tests
+python3 -m unittest discover -s tests      # tests
 ```
+
+Reference docs: [app.md](skills/studyloop/references/app.md) (page, round and bank formats, server API),
+[quiz-rules.md](skills/studyloop/references/quiz-rules.md) (how questions are written),
+[DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
 ## Credits
 
 The study workflow started from the `tutor` and `tutor-setup` skills in
 [RoundTable02/tutor-skills](https://github.com/RoundTable02/tutor-skills).
-Design notes: [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).

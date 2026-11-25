@@ -5,7 +5,7 @@
 #   Straight from GitHub:    curl -fsSL https://raw.githubusercontent.com/CodingBear123/studyloop/main/install.sh | sh
 #
 # What it does: checks Python, gets the tool (into ~/.studyloop unless run from a copy),
-# links the /study and /study-vault skills into ~/.claude/skills, adds the "Studyloop" app and the
+# links the /studyloop and /studyloop-setup skills into ~/.claude/skills, adds the "Studyloop" app and the
 # `studyloop` command, and checks for Claude Code and pdftotext.
 set -e
 
@@ -47,7 +47,7 @@ OLD="$HOME/.claude-study-tool"  # where it lived before the rename to Studyloop
 if [ -z "$STUDYLOOP_HOME" ] && [ -d "$OLD" ] && [ ! -e "$DEST" ]; then
   mv "$OLD" "$DEST" && ok "moved $OLD to $DEST"
 fi
-if [ -n "$HERE" ] && [ -f "$HERE/skills/study/app/server.py" ]; then
+if [ -n "$HERE" ] && [ -f "$HERE/skills/studyloop/app/server.py" ]; then
   SRC="$HERE"
   ok "using this copy: $SRC"
 elif [ -d "$DEST/.git" ] && git --version >/dev/null 2>&1; then
@@ -68,12 +68,17 @@ else
     exit 1
   fi
 fi
-APP="$SRC/skills/study/app"
+APP="$SRC/skills/studyloop/app"
 
 # 3. Skills for Claude Code (a link, so updating the tool updates the skills)
-bold "3/5 /study and /study-vault for Claude"
+bold "3/5 /studyloop and /studyloop-setup for Claude"
 mkdir -p "$SKILLS"
-for s in study study-vault; do
+for old in study study-vault; do  # the names before /studyloop and /studyloop-setup
+  if [ -L "$SKILLS/$old" ] && case "$(readlink "$SKILLS/$old")" in */skills/$old) true ;; *) false ;; esac; then
+    rm -f "$SKILLS/$old" && ok "removed the old /$old link"
+  fi
+done
+for s in studyloop studyloop-setup; do
   if [ -e "$SKILLS/$s" ] && [ ! -L "$SKILLS/$s" ]; then
     mv "$SKILLS/$s" "$SKILLS/$s.backup-$(date +%Y%m%d%H%M%S)"
     warn "moved your old $s skill folder aside ($s.backup-…)"
@@ -127,7 +132,7 @@ bold "5/5 Checks"
 if command -v claude >/dev/null 2>&1 || [ -x "$HOME/.local/bin/claude" ]; then
   ok "Claude Code"
 else
-  warn "Claude Code isn't installed. /study and /study-vault run inside it, and the page uses it for"
+  warn "Claude Code isn't installed. /studyloop and /studyloop-setup run inside it, and the page uses it for"
   warn "\"Check with Claude\" and \"Ask Claude\"."
   if ask "Install Claude Code now (official installer from claude.ai)?"; then
     curl -fsSL https://claude.ai/install.sh | bash && ok "Claude Code installed; run 'claude' once to sign in"
@@ -140,9 +145,9 @@ if command -v pdftotext >/dev/null 2>&1; then
 elif command -v brew >/dev/null 2>&1 && ask "Install pdftotext with Homebrew (to read PDF slides)?"; then
   brew install poppler >/dev/null && ok "pdftotext"
 else
-  warn "pdftotext is missing: /study-vault reads PDFs better with it (Mac: brew install poppler)"
+  warn "pdftotext is missing: /studyloop-setup reads PDFs better with it (Mac: brew install poppler)"
 fi
 
 bold "Done."
-echo "  Make study notes: open Claude in your course folder and type /study-vault"
-echo "  Study:            type /study, or open the Studyloop app"
+echo "  Make study notes: open Claude in your course folder and type /studyloop-setup"
+echo "  Study:            type /studyloop, or open the Studyloop app"

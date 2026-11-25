@@ -1,7 +1,7 @@
 {
   "name": "studyloop",
   "version": "1.0.0",
-  "description": "Turn course material into an Obsidian StudyVault (/study-vault) and get quizzed on it in a local browser page with concept-level progress tracking (/study).",
+  "description": "Turn course material into an Obsidian StudyVault (/studyloop-setup) and get quizzed on it in a local browser page with concept-level progress tracking (/studyloop).",
   "author": {
     "name": "CodingBear123"
   },

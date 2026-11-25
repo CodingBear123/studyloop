@@ -43,9 +43,9 @@ StudyVault/
 | `areas[].slug` | lowercase, digits, dashes; unique; names `concepts/<slug>.md` and `question-bank/<slug>.json` |
 | `areas[].title` | display name used on the dashboard and the page |
 | `areas[].folder` | `NN-Name` folder with that area's notes and practice file |
-| `areas[].excluded` | optional: tracked but not on the exam; /study skips it, weakest/strongest ignore it |
+| `areas[].excluded` | optional: tracked but not on the exam; /studyloop skips it, weakest/strongest ignore it |
 | `extra_folders` | every other `NN-` folder (dashboard, past exams) |
-| `exam`, `scope` | optional, free text; /study reads them to plan and to stay in scope |
+| `exam`, `scope` | optional, free text; /studyloop reads them to plan and to stay in scope |
 
 Adding an area = add it to `areas`, create the folder, then `studyvault.py migrate VAULT --write` (it keeps
 the manifest and creates the missing tracker and bank files). Never rename a slug that has tracking data.
@@ -68,7 +68,7 @@ the manifest and creates the missing tracker and bank files). Never rename a slu
 ```
 
 - Status is the result of the **last** attempt: `solved` right, `open` wrong. `untested` means planned but not tested yet:
-  `| name | 0 | 0 | - | untested |` (a vault may list every concept of an area up front; /study uses them for
+  `| name | 0 | 0 | - | untested |` (a vault may list every concept of an area up front; /studyloop uses them for
   diagnostics, and the first answer turns the row solved or open).
 - Concept names never contain `|`; use `∣` (U+2223), which `record` substitutes automatically.
 - Every open row has an error note. Notes stay when the concept turns solved (learning history); a new miss

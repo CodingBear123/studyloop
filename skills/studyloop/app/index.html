@@ -1383,7 +1383,7 @@ function resultsHTML() {
   const perfect = graded.length && right === graded.length;
   const scoreLine = graded.length ? `<p class="score">${right}/${graded.length}</p>` : `<p class="score">Sent</p>`;
   let note;
-  if (submitted.saveError) note = `<p><span class="err">Could not save: ${esc(submitted.saveError)}.</span> Start it again (<code>python3 ~/.claude/skills/study/app/server.py</code>), then save. Your answers stay on this page.</p>
+  if (submitted.saveError) note = `<p><span class="err">Could not save: ${esc(submitted.saveError)}.</span> Start it again (<code>python3 ~/.claude/skills/studyloop/app/server.py</code>), then save. Your answers stay on this page.</p>
       <div class="row" style="margin-top:.6rem"><button class="btn btn--sm btn--mint" id="retry">Try saving again</button></div>
       <details style="margin-top:.6rem"><summary class="small" style="cursor:pointer;font-weight:700">Or paste this to Claude</summary><div class="paste">${esc(pasteString())}</div></details>`;
   else if (round.source === "claude") note = `<p>Go back to Claude and say <strong>done</strong>. Claude grades it and updates your StudyVault.</p>

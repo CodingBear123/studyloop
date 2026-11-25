@@ -1,6 +1,6 @@
 # Vault checklist
 
-Run `python3 ../study/app/studyvault.py check VAULT` first: it must report 0 errors. Then check by reading:
+Run `python3 ../studyloop/app/studyvault.py check VAULT` first: it must report 0 errors. Then check by reading:
 
 ## Data (the tool checks these)
 - [ ] `studyvault.json` lists every area folder; every `NN-` folder is an area or in `extra_folders`
@@ -22,7 +22,7 @@ Run `python3 ../study/app/studyvault.py check VAULT` first: it must report 0 err
 - [ ] practice answers are all folded (`> [!answer]-`); question kinds are tagged and mixed
 - [ ] 6+ bank questions per area, each with `concept`, `difficulty`, `explanation`
 - [ ] every answer key double-checked; code in questions runs and prints what the answer says
-- [ ] no hints in options (see `../study/references/quiz-rules.md`)
+- [ ] no hints in options (see `../studyloop/references/quiz-rules.md`)
 
 ## Dashboard folder
 - [ ] MOC links every note and practice file

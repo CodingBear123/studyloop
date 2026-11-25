@@ -12,7 +12,8 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]  # app -> study -> skills -> repository
-SKILLS = ("study", "study-vault")
+SKILLS = ("studyloop", "studyloop-setup")
+OLD_SKILLS = {"study": "studyloop", "study-vault": "studyloop-setup"}  # names before 2026-11-25
 MARKERS = (".studyloop", ".claude-study-tool")  # left in skill copies by install.ps1 (old name too)
 CHECK_EVERY = 3600  # seconds between fetches from GitHub; "check now" skips the wait
 _lock = threading.Lock()
@@ -74,8 +75,31 @@ def status(force=False):
         return _cache["info"]
 
 
+def rename_old(home=None):
+    """Move installs from /study and /study-vault to /studyloop and /studyloop-setup: a link of ours to the old
+    folder becomes a link to the new one, a copy of ours is removed (refresh_copies writes the new copy)."""
+    skills, done = Path(home or Path.home()) / ".claude" / "skills", []
+    for old, new in OLD_SKILLS.items():
+        t, n = skills / old, skills / new
+        if t.is_symlink():
+            if Path(os.readlink(t)).name != old or Path(os.readlink(t)).parent.name != "skills":
+                continue  # a link to something else: not ours
+            t.unlink()
+            if not n.exists() and not n.is_symlink():
+                n.symlink_to(REPO / "skills" / new, target_is_directory=True)
+            done.append(old)
+        elif t.is_dir() and any((t / m).exists() for m in MARKERS):
+            shutil.rmtree(t)
+            if not n.exists():
+                n.mkdir(parents=True)
+                (n / ".studyloop").write_text("placeholder until refresh_copies fills it\n", encoding="utf-8")
+            done.append(old)
+    return done
+
+
 def refresh_copies(home=None):
     """Windows installs copy the skills instead of linking them: copy them again from the repository."""
+    rename_old(home)
     done = []
     for s in SKILLS:
         src, t = REPO / "skills" / s, Path(home or Path.home()) / ".claude" / "skills" / s

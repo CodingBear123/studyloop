@@ -4,7 +4,7 @@
 #   Straight from GitHub:   irm https://raw.githubusercontent.com/CodingBear123/studyloop/main/install.ps1 | iex
 #
 # What it does: checks Python (installs it with winget if missing), gets the tool with git or as a ZIP (into
-# %USERPROFILE%\.studyloop unless run from a copy), copies the /study and /study-vault skills into
+# %USERPROFILE%\.studyloop unless run from a copy), copies the /studyloop and /studyloop-setup skills into
 # %USERPROFILE%\.claude\skills, adds a "Studyloop" shortcut to the Desktop and Start menu, and checks for Claude Code.
 $ErrorActionPreference = "Stop"
 $Repo = "CodingBear123/studyloop"
@@ -53,7 +53,7 @@ Bold "2/4 Studyloop"
 $Here = if ($PSScriptRoot) { $PSScriptRoot } else { "" }
 $Old = Join-Path $HOME ".claude-study-tool"   # where it lived before the rename to Studyloop
 if (-not $env:STUDYLOOP_HOME -and (Test-Path $Old) -and -not (Test-Path $Dest)) { Move-Item $Old $Dest; Ok "moved $Old to $Dest" }
-if ($Here -and (Test-Path (Join-Path $Here "skills\study\app\server.py"))) {
+if ($Here -and (Test-Path (Join-Path $Here "skills\studyloop\app\server.py"))) {
   $Src = $Here; Ok "using this copy: $Src"
 } elseif ((Test-Path (Join-Path $Dest ".git")) -and (Get-Command git -ErrorAction SilentlyContinue)) {
   if (Git-Ok -C $Dest pull --ff-only --quiet) { Ok "updated $Dest" } else { Warn "couldn't update $Dest, keeping the version there" }
@@ -81,11 +81,15 @@ if ($Here -and (Test-Path (Join-Path $Here "skills\study\app\server.py"))) {
   Remove-Item $zip, $tmp -Recurse -Force -ErrorAction SilentlyContinue
   $Src = $Dest; Ok "downloaded to $Dest"
 }
-$App = Join-Path $Src "skills\study\app"
+$App = Join-Path $Src "skills\studyloop\app"
 
-Bold "3/4 /study and /study-vault for Claude"
+Bold "3/4 /studyloop and /studyloop-setup for Claude"
 New-Item -ItemType Directory -Force $Skills | Out-Null
-foreach ($s in @("study", "study-vault")) {
+foreach ($old in @("study", "study-vault")) {   # the names before /studyloop and /studyloop-setup
+  $t = Join-Path $Skills $old
+  if ((Test-Path (Join-Path $t ".studyloop")) -or (Test-Path (Join-Path $t ".claude-study-tool"))) { Remove-Item $t -Recurse -Force; Ok "removed the old /$old copy" }
+}
+foreach ($s in @("studyloop", "studyloop-setup")) {
   $t = Join-Path $Skills $s
   $mark = Join-Path $t ".studyloop"   # left by this installer: such a copy is ours to replace
   if (Test-Path $t) {
@@ -121,7 +125,7 @@ if (Ask "Start Studyloop in the background when you log in (so it opens instantl
 
 if (Get-Command claude -ErrorAction SilentlyContinue) { Ok "Claude Code" }
 else {
-  Warn "Claude Code isn't installed. /study and /study-vault run inside it, and the page uses it for"
+  Warn "Claude Code isn't installed. /studyloop and /studyloop-setup run inside it, and the page uses it for"
   Warn "'Check with Claude' and 'Ask Claude'."
   if (Ask "Install Claude Code now (official installer from claude.ai)?") {
     Invoke-RestMethod https://claude.ai/install.ps1 | Invoke-Expression
@@ -130,6 +134,6 @@ else {
 }
 
 Bold "Done."
-Write-Host "  Make study notes: open Claude in your course folder and type /study-vault"
-Write-Host "  Study:            type /study, or double-click Studyloop on your Desktop"
+Write-Host "  Make study notes: open Claude in your course folder and type /studyloop-setup"
+Write-Host "  Study:            type /studyloop, or double-click Studyloop on your Desktop"
 Read-Host "Press Enter to close" | Out-Null

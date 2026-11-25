@@ -5,7 +5,7 @@
     {
       "name": "studyloop",
       "source": "./",
-      "description": "/study and /study-vault: StudyVault notes, browser quizzes and concept tracking."
+      "description": "/studyloop and /studyloop-setup: StudyVault notes, browser quizzes and concept tracking."
     }
   ]
 }

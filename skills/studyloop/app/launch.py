@@ -100,7 +100,7 @@ def pick_vaults(arg, force):
     while not vaults:
         if folder:
             tell(f"There is no StudyVault in\n{folder}\n\nPick the folder your course notes are in. "
-                 "If you have no vault yet, ask Claude: /study-vault", error=True)
+                 "If you have no vault yet, ask Claude: /studyloop-setup", error=True)
         folder = choose_folder()
         if not folder:
             sys.exit(1)

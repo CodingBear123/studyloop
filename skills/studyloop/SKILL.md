@@ -1,14 +1,14 @@
 ---
-name: study
+name: studyloop
 description: >
   Quiz and track study progress in an Obsidian StudyVault (studyloop). Use when the user
   wants to be quizzed or tested, study or review a topic, drill weak areas, run an exam simulation,
   follow a timed study plan ("I have 2 hours"), grade a round they took in the browser app, or check
-  their progress. Triggers: "/study", "quiz me", "test me", "let's study", "drill", "how am I doing".
-  Needs a vault made by /study-vault (or an older /tutor vault, which it migrates).
+  their progress. Triggers: "/studyloop", "quiz me", "test me", "let's study", "drill", "how am I doing".
+  Needs a vault made by /studyloop-setup (or an older /tutor vault, which it migrates).
 ---
 
-# /study
+# /studyloop
 
 Quiz the user, find what they don't know at the **concept level**, and keep the StudyVault's tracking data
 consistent. Questions are answered in a local browser page (code keeps its indentation there), and every
@@ -33,7 +33,7 @@ write to tracking data goes through one script.
 ## 1. Find the vault
 
 1. Look for `StudyVault/` under the current folder (`python3 APP/studyvault.py find .`). If there are several,
-   pick the one the user named or ask. If there is none, tell them to run `/study-vault` and stop.
+   pick the one the user named or ask. If there is none, tell them to run `/studyloop-setup` and stop.
 2. If it has no `studyvault.json`, it's an older vault: run `studyvault.py migrate VAULT`, show the inferred
    areas, and after a yes run it again with `--write`.
 3. Run `studyvault.py status VAULT` and `studyvault.py check VAULT`. Fix errors before quizzing
