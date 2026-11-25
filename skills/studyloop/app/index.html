@@ -690,7 +690,7 @@ const DE_PAT = [
   [/^Option ([A-H]) is correct$/, "Antwort $1 ist richtig"], [/^Option ([A-H])$/, "Antwort $1"], [/^Remove option ([A-H])$/, "Antwort $1 entfernen"],
   [/^Saved to your StudyVault: 1 answer recorded and the Learning Dashboard recomputed\.$/, "In deiner StudyVault gespeichert: 1 Antwort erfasst und das Lern-Dashboard neu berechnet."],
   [/^Saved to your StudyVault: (\d+) answers recorded and the Learning Dashboard recomputed\.$/, "In deiner StudyVault gespeichert: $1 Antworten erfasst und das Lern-Dashboard neu berechnet."],
-  [/^overall · (.*)$/, "gesamt · $1"], [/^(\d+) percent$/, "$1 Prozent"], [/^best (\d+) days?$/, "Bestwert $1 Tage"], [/^(\d+)\+ questions$/, "$1+ Fragen"],
+  [/^overall · (.*)$/, "gesamt · $1"], [/^points · (\d+) right, (\d+) Kprim with half points$/, "Punkte · $1 richtig, $2 Kprim mit halber Punktzahl"], [/^(\d+) percent$/, "$1 Prozent"], [/^best (\d+) days?$/, "Bestwert $1 Tage"], [/^(\d+)\+ questions$/, "$1+ Fragen"],
   [/^(\d+) questions?$/, (_, n) => n === "1" ? "1 Frage" : n + " Fragen"], [/^\/ (\d+) questions today$/, "/ $1 Fragen heute"],
   [/^Concept \(a row name in (.+); hidden until graded, and used for tracking\)$/, "Konzept (ein Zeilenname in $1; bis zur Bewertung verborgen, wird fürs Tracking verwendet)"],
   [/^auto: (.*)$/s, "automatisch: $1"], [/^(\d+) changes$/, "$1 Änderungen"], [/^1 change on GitHub/, "1 Änderung auf GitHub"], [/^(\d+) changes on GitHub/, "$1 Änderungen auf GitHub"],
@@ -1532,7 +1532,10 @@ function resultsHTML() {
   const graded = submitted.answers.filter(a => a.correct !== null);
   const right = graded.filter(a => a.correct).length;
   const perfect = graded.length && right === graded.length;
-  const scoreLine = graded.length ? `<p class="score">${right}/${graded.length}</p>` : `<p class="score">Sent</p>`;
+  // exam points: a Kprim with 3 of 4 statements right is worth half a point (the tracker still counts it as missed)
+  const half = submitted.answers.filter((a, i) => a.type === "kprim" && !a.correct && a.right === 3 && round.questions[i].answer?.length === 4).length;
+  const points = String(right + half / 2).replace(".", LANG === "de" ? "," : ".");
+  const scoreLine = graded.length ? `<p class="score">${points}/${graded.length}</p>` : `<p class="score">Sent</p>`;
   let note;
   if (submitted.saveError) note = `<p><span class="err">Could not save: ${esc(submitted.saveError)}.</span> Start it again (<code>python3 ~/.claude/skills/studyloop/app/server.py</code>), then save. Your answers stay on this page.</p>
       <div class="row" style="margin-top:.6rem"><button class="btn btn--sm btn--mint" id="retry">Try saving again</button></div>
@@ -1547,7 +1550,7 @@ function resultsHTML() {
     if (!submitted.tracked) note += `<p>Open answers still need a grade: compare them with the model answer below${claudeCheck ? " or let Claude check them" : ""}.</p>`;
   }
   return `<section class="block ${perfect ? "celebrate" : "hero"}" style="margin-bottom:calc(var(--gap) + 4px)"><div class="row" style="align-items:flex-end">
-    ${scoreLine}<div class="grow"><p class="meta">${perfect ? say("Clean sweep.", "Nice work, every one right.") : graded.length ? "graded correct" : "answers submitted"}</p>${note}</div></div></section>`;
+    ${scoreLine}<div class="grow"><p class="meta">${perfect ? say("Clean sweep.", "Nice work, every one right.") : !graded.length ? "answers submitted" : half ? tr(`points · ${right} right, ${half} Kprim with half points`) : "graded correct"}</p>${note}</div></div></section>`;
 }
 
 // ---- progress ----
